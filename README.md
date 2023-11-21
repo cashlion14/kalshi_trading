@@ -5,9 +5,9 @@ Elie Cuevas, Jake Jones
 Our goal is to begin trading systemmatically on Kalshi, an event contract exchange. 
 
 **Quickstart**
-1. Make venv with  ```python -m venv env```
-2. Activate venv with ```env/Scripts/activate``` 
-3. Download packages with ```pip install requirements.txt```
+1. Make venv with  ```python -m venv env``` on Windows or ```python3 -m venv env``` on Mac
+2. Activate venv with ```env/Scripts/activate``` on Windows or ```source env/bin/activate``` on Mac
+3. Download packages with ```pip install -r requirements.txt```
 
 **Steps:**
 1. Infrastructure building
