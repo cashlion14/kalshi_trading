@@ -12,8 +12,8 @@ Our goal is to begin trading systemmatically on Kalshi, an event contract exchan
 5. Live Trading
 
 **Infrastructure Building:**
-    Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade
-    Use cloud service to run server
+    
+Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade. Use cloud service to run server. Use Kalshi API: https://kalshi.com/api? to connect to exchange.
 
 **Idea Generation:**
 1. Market making
