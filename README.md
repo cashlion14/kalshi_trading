@@ -1,5 +1,4 @@
-# kalshi_trading
-Algorithmic Trading on Kalshi
+# Algorithmic Trading on Kalshi
 
 Elie Cuevas, Jake Jones
 
