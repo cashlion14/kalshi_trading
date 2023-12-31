@@ -3,7 +3,7 @@ import csv
 from client import ExchangeClient, start_kalshi_api
 
 '''
-Creates a csv with kalshi data for a given account, yes market, and range.
+Creates a csv with kalshi data for a given account, yes market, and time range (EST).
 Saves the csv to the data_storage folder.
 Assumes range is in the past (market not currently open) and is <= 1 day.
 '''
@@ -13,7 +13,6 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
     end_timestamp = int(end_date.timestamp())
     
     data = account.get_market_history(ticker=market, limit=1000, min_ts=start_timestamp, max_ts=end_timestamp)
-    print(data)
     data_dict = data['history']
     
     field_names = ['datetime', 'bid', 'ask', 'open_interest', 'volume']
@@ -36,3 +35,4 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
 if __name__ == "__main__":
     exchange_client = start_kalshi_api()
     # create_csv(exchange_client, 'INXDU-23AUG15-T4499.99', dt.fromtimestamp(1692104400), dt.fromtimestamp(1692109400))
+    # create_csv(exchange_client, 'INXDU-23DEC29-T4749.99', dt(2023, 12, 29, 9, 0, 1), dt(2023, 12, 29, 13, 0, 0))

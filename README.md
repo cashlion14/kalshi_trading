@@ -26,3 +26,4 @@ Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade. 
 3. EOD/Microstructure trades (look for patterns at open, close, etc)
 4. Hedge options using Kalshi exchange
 5. Find further ideas here: https://medium.com/@mlblogging.k/10-awesome-books-for-quantitative-trading-fc0d6aa7e6d8
+6. Arbitrage: yes_ask + yes_bid < 100
