@@ -1,4 +1,5 @@
 from datetime import datetime as dt
+from datetime import timedelta
 from enum import Enum
 import csv
 import yfinance as yf
@@ -23,6 +24,17 @@ def get_daily_index_prices(ticker: str, start_date: dt, end_date: dt) -> pd.Data
     df.drop('Dividends', axis=1, inplace=True)
     df.drop('Stock Splits', axis=1, inplace=True)
     return df
+
+'''
+Finds all days on which the market is open between the start date and end date
+'''
+def get_market_days(start_date: dt, end_date: dt) -> pd.DataFrame:
+    df = pd.read_csv("data_storage/market_data/market_days.csv", )
+    df['market_open']= pd.to_datetime(df['market_open']).dt.tz_convert(None)
+    df = df[df['market_open'].between(start_date, end_date)]
+    days = df['market_open'].to_list()
+    for index, day in enumerate(days):
+        days[index] = day.date()
            
 '''
 Returns a list of lists of the form [market string, start date, end date]
@@ -37,13 +49,12 @@ def get_sub_markets(account: ExchangeClient, market: IndexMarket, start_date: dt
         raise NotImplementedError
     elif market == IndexMarket.SpDailyRange:
         prices_df = get_daily_index_prices('^SPX', start_date, end_date)
+        market_days = get_market_days(start_date, end_date)
         #SP INXD-24JAN05-T4625
     elif market == IndexMarket.NasdaqDailyRange:
         prices_df = get_daily_index_prices('^NDX', start_date, end_date)
         #NDQ NASDAQ100D-24JAN05-T16300
-    elif market == IndexMarket.SpYearlyRange:
-        pass
-    elif market == IndexMarket.NasdaqYearlyRange:
+    elif market == IndexMarket.SpYearlyRange or market == IndexMarket.NasdaqYearlyRange:
         pass
 
 '''
@@ -63,7 +74,7 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
     data_dict = data['history']
     
     field_names = ['datetime', 'bid', 'ask', 'open_interest', 'volume']
-    csv_name = f'data_storage/{market}_{start_date}_{end_date}.csv'
+    csv_name = f'data_storage/kalshi_data/{market}_{start_date}_{end_date}.csv'
     
     with open(csv_name, 'w') as file:
         writer = csv.DictWriter(file, fieldnames = field_names)
@@ -82,8 +93,8 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
 Creates csvs with kalshi data and writes them to the data_storage folder.
     account: the ExchangeClient representing a kalshi account
     market: the type of index market that will be stored
-    start_date: the first time at which to retrieve data
-    end_date: the last time at which to retrieve data
+    start_date: the first time at which to retrieve data (include hour + minute)
+    end_date: the last time at which to retrieve data (include hour + minute)
     interval: the interval at which to retrieve data
     volume_threshhold: the % volume of the total event a market must have to be saved
 Assumes market is not currently open.
@@ -101,4 +112,7 @@ if __name__ == "__main__":
     # create_csv(exchange_client, 'INXDU-23AUG15-T4499.99', dt.fromtimestamp(1692104400), dt.fromtimestamp(1692109400))
     # create_csv(exchange_client, 'INXDU-23DEC29-T4749.99', dt(2023, 12, 29, 9, 0, 1), dt(2023, 12, 29, 13, 0, 0))
     # print(exchange_client.get_market_history('INXZ-23DEC26-T4754.63'))
+
+
+    
     
