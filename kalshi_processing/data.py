@@ -1,14 +1,61 @@
 from datetime import datetime as dt
+from enum import Enum
 import csv
+import yfinance as yf
 from client import ExchangeClient, start_kalshi_api
+import pandas as pd
+
+class IndexMarket(Enum):
+    SpDailyRange = 1
+    SpUpDown = 2
+    SpYearlyRange = 3
+    NasdaqDailyRange = 4
+    NasdaqUpDown = 5
+    NasdaqYearlyRange = 6
 
 '''
-Creates a csv with kalshi data for a given account, yes market, and time range (EST).
-Saves the csv to the data_storage folder.
-Assumes range is in the past (market not currently open) and is <= 1 day.
+Gives daily price data for a given ticker
+'''      
+def get_daily_index_prices(ticker: str, start_date: dt, end_date: dt) -> pd.DataFrame:
+    index = yf.Ticker(ticker)
+    df = index.history(interval = "1d", start = start_date, end = end_date)
+    df.drop('Volume', axis=1, inplace=True)
+    df.drop('Dividends', axis=1, inplace=True)
+    df.drop('Stock Splits', axis=1, inplace=True)
+    return df
+           
+'''
+Returns a list of lists of the form [market string, start date, end date]
+These kalshi markets make up the market over the whole time period and are above the volume threshhold 
+'''
+def get_sub_markets(account: ExchangeClient, market: IndexMarket, start_date: dt, end_date: dt, interval: dt, volume_threshold: int) -> list[list]:
+    if market == IndexMarket.SpUpDown:
+        'INXZ-24JAN02-T4769.83'
+        #price is the previous day's close
+        raise NotImplementedError
+    elif market == IndexMarket.NasdaqUpDown:
+        raise NotImplementedError
+    elif market == IndexMarket.SpDailyRange:
+        prices_df = get_daily_index_prices('^SPX', start_date, end_date)
+        #SP INXD-24JAN05-T4625
+    elif market == IndexMarket.NasdaqDailyRange:
+        prices_df = get_daily_index_prices('^NDX', start_date, end_date)
+        #NDQ NASDAQ100D-24JAN05-T16300
+    elif market == IndexMarket.SpYearlyRange:
+        pass
+    elif market == IndexMarket.NasdaqYearlyRange:
+        pass
+
+'''
+Creates a csv for a given market string from start_date to end_date.
+Saves files to the data storage folder. 
+Assumes market is not currently open.
 '''
 def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: dt) -> None:
-    
+
+    # limit issue with pages
+    # how will I organize the data storage folder?
+
     start_timestamp = int(start_date.timestamp())
     end_timestamp = int(end_date.timestamp())
     
@@ -31,8 +78,27 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
             modified_entry['volume'] = entry['volume']
             writer.writerow(modified_entry)
 
+'''
+Creates csvs with kalshi data and writes them to the data_storage folder.
+    account: the ExchangeClient representing a kalshi account
+    market: the type of index market that will be stored
+    start_date: the first time at which to retrieve data
+    end_date: the last time at which to retrieve data
+    interval: the interval at which to retrieve data
+    volume_threshhold: the % volume of the total event a market must have to be saved
+Assumes market is not currently open.
+'''
+def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, interval: dt, volume_threshold: int) -> None:
     
+    account = start_kalshi_api()
+    markets = get_sub_markets(account, market, start_date, end_date, interval, volume_threshold)
+    
+    for mkt_string, start, end in markets:
+        create_csv(account, mkt_string, start, end)
+
 if __name__ == "__main__":
     exchange_client = start_kalshi_api()
     # create_csv(exchange_client, 'INXDU-23AUG15-T4499.99', dt.fromtimestamp(1692104400), dt.fromtimestamp(1692109400))
     # create_csv(exchange_client, 'INXDU-23DEC29-T4749.99', dt(2023, 12, 29, 9, 0, 1), dt(2023, 12, 29, 13, 0, 0))
+    # print(exchange_client.get_market_history('INXZ-23DEC26-T4754.63'))
+    
