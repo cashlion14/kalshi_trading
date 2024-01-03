@@ -21,6 +21,8 @@ class IndexInterval(Enum):
     FifteenMin = 4
     OneHour = 5
 
+### HELPER FUNCTIONS ###
+
 '''
 Gives daily price data for a given ticker
 '''      
@@ -218,6 +220,8 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
             modified_entry['open_interest'] = entry['open_interest']
             modified_entry['volume'] = entry['volume']
             writer.writerow(modified_entry)
+
+### MAIN FUNCTION ###
 
 '''
 Creates csvs with kalshi data and writes them to the data_storage folder.
