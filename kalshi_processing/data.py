@@ -84,7 +84,6 @@ def market_to_kalshi_dates(market_days: list) -> list:
 
 '''
 Returns a list of market strings for s&p or nasdaq up/down markets
-Known issue: up/down markets are not open some days due to low vol, which means ~1/3 days throw errors
 '''
 def get_up_down_sub_markets(yf_ticker: str, kalshi_ticker: str, start_date: dt, end_date: dt, market_days: list) -> list[str]:
     #get prices for all of the market days btwn start and end date, plus the preceeding day or two
@@ -117,7 +116,6 @@ def get_up_down_sub_markets(yf_ticker: str, kalshi_ticker: str, start_date: dt, 
 
 '''
 Returns a list of market strings for s&p or nasdaq yearly range markets
-Known issue: Nasdaq 2022 yearly range market does not have enough vol
 '''
 def get_yearly_range_sub_markets(year_to_ticker: dict, start_date: dt, end_date: dt) -> list[str]:
     start_year = start_date.year
@@ -193,7 +191,6 @@ def find_nd_daily_range_prices(markets: list, high_prices: list, low_prices: lis
 
 '''
 Returns a list of market strings for s&p or nasdaq daily range markets
-Known issue: some random SPX days use ticker INDW instead of INDX, causing some errors
 '''
 def get_daily_range_sub_markets(market_days: list, market: IndexMarket, yf_ticker: str, start_date: dt, end_date: dt) -> list[str]:
     prices_df = get_daily_index_prices(yf_ticker, start_date, end_date)
@@ -245,7 +242,6 @@ def find_nd_daily_above_below_prices(markets, high_prices, low_prices, market_ti
 
 '''
 Returns a list of market strings for s&p or nasdaq daily above below markets
-Known issue: market only began on June 23rd, 2023
 '''
 def get_daily_above_below_sub_markets(market: IndexMarket, market_days: list, yf_ticker: str, start_date: dt, end_date: dt):
     
@@ -391,7 +387,13 @@ Creates csvs with kalshi data and writes them to the data_storage folder.
     end_date: the last time at which to retrieve data (include hour + minute)
     interval: the interval at which to retrieve data (not yet implemented)
 Assumes market is not currently open.
-Interval function is not implemented yet. 
+
+Known issues:
+    Up/down markets are not open some days due to low vol, which means ~1/3 days throw errors
+    Nasdaq 2022 yearly range market does not have enough vol
+    Some random SPX days use ticker INDW instead of INDX, causing some errors
+    Above/Below markets only began on June 23rd, 2023
+    Interval functionality is not yet implemented
 '''
 def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, interval: IndexInterval) -> None:
     
