@@ -31,8 +31,11 @@ class IndexInterval(Enum):
 Gives daily price data for a given ticker
 '''      
 def get_daily_index_prices(ticker: str, start_date: dt, end_date: dt) -> pd.DataFrame:
+    
     index = yf.Ticker(ticker)
     df = index.history(interval = "1d", start = start_date, end = end_date)
+    
+    #remove unneeded columns from df
     df.drop('Volume', axis=1, inplace=True)
     df.drop('Dividends', axis=1, inplace=True)
     df.drop('Stock Splits', axis=1, inplace=True)
@@ -44,9 +47,15 @@ Returns a list of date objects
 '''
 def get_market_days(start_date: dt, end_date: dt) -> list:
     df = pd.read_csv("data_storage/market_data/market_days.csv", )
+    
+    #conversion to allow between comparison
     df['market_open']= pd.to_datetime(df['market_open']).dt.tz_convert(None)
+    
+    #find all market days within range
     df = df[df['market_open'].between(start_date, end_date+timedelta(1))]
     days = df['market_open'].to_list()
+    
+    #change format and return
     for index, day in enumerate(days):
         days[index] = day.date()
     return days
@@ -56,34 +65,13 @@ Takes in a list market days as date objects and returns a list of kalshi date st
 '''
 def market_to_kalshi_dates(market_days: list) -> list:
     kalshi_days = []
+    months = ['JAN', 'FEB', "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+    
     for market_day in market_days:
         year = str(market_day.year)[-2:]
-        month = market_day.month
         
-        if month == 1:
-            month = 'JAN'
-        if month == 2:
-            month = 'FEB'
-        if month == 3:
-            month = 'MAR'
-        if month == 4:
-            month = 'APR'
-        if month == 5:
-            month = 'MAY'
-        if month == 6:
-            month = 'JUN'
-        if month == 7:
-            month = 'JUL'
-        if month == 8:
-            month = 'AUG'
-        if month == 9:
-            month = 'SEP'
-        if month == 10:
-            month = 'OCT'
-        if month == 11:
-            month = 'NOV'
-        if month == 12:
-            month = 'DEC'
+        month = market_day.month
+        month = months[month]
 
         day = market_day.day
         if day < 10:
@@ -145,25 +133,31 @@ def get_yearly_range_sub_markets(year_to_ticker: dict, start_date: dt, end_date:
 Finds all prices that a Kalshi daily range s&p market could exist at between that day's high and low prices
 '''
 def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list, low_prices: list, market_tickers: list):
-    #before May 19th 2023 markets are 50 points wide, after they are 25 wide
+    # before May 19th 2023 markets are 50 points wide, after they are 25 wide
     before_051923 = start_date < dt(2023, 5, 19, 9, 30, 0)
     
+    # go from low to high and find all prices to attach to ticker
     for high, low, ticker in zip(high_prices, low_prices, market_tickers):
         if ticker == '23MAY19':
             before_051923 = False
-            
+        
         if before_051923:
+            
+            #if btwn 25 and 75 round down to the 25 market
             if low % 100 > 25 and low % 100 < 75:
                 first_price = int(str(low)[:2]+'25')
             else:
                 first_price = int(str(low)[:2]+'75')
             
+            #work up to the high price
             price = first_price
             while price <= high:
                 markets.append(f'INXD-{ticker}-B{price}')
                 price += 50
                 
         else: 
+            
+            #round to the nearest market below
             if low % 100 > 12 and low % 100 < 37:
                 first_price = int(str(low)[:2]+'12')
             elif low % 100 >=37 and low % 100 < 62:
@@ -173,6 +167,7 @@ def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list,
             else:
                 first_price = int(str(low)[:2]+'87')
             
+            #work up to the high price
             price = first_price
             while price <= high:
                 markets.append(f'INXD-{ticker}-B{price}')
@@ -186,21 +181,21 @@ Finds all prices that a Kalshi daily range nasdaq market could exist at between 
 def find_nd_daily_range_prices(markets: list, high_prices: list, low_prices: list, market_tickers: list):
     
     for high, low, ticker in zip(high_prices, low_prices, market_tickers):
-        
+        #find the first price below the low
         first_price = int(str(int(str(low)[:3])-1)+'50')
         
+        #work up to the high price
         price = first_price
         while price <= high:
             markets.append(f'NASDAQ100D-{ticker}-B{price}')
-            price += 100
-                
+            price += 100    
     return markets
 
 '''
 Returns a list of market strings for s&p or nasdaq daily range markets
 Known issue: some random SPX days use ticker INDW instead of INDX, causing some errors
 '''
-def get_daily_range_sub_markets(market_days: list, market: IndexMarket, yf_ticker: str, start_date: dt, end_date: dt):
+def get_daily_range_sub_markets(market_days: list, market: IndexMarket, yf_ticker: str, start_date: dt, end_date: dt) -> list[str]:
     prices_df = get_daily_index_prices(yf_ticker, start_date, end_date)
         
     high_prices = prices_df['High'].tolist()
@@ -220,9 +215,11 @@ Finds all prices that a Kalshi above below s&p market could exist at between tha
 def find_sp_daily_above_below_prices(markets, high_prices, low_prices, market_tickers):
     
     for high, low, ticker in zip(high_prices, low_prices, market_tickers):
-    
+        
+        #round down to a market below the low
         first_price = float(str(int(str(low)[:2])-1)+'74.99')
         
+        #work up to the high price in 25 dollar increments
         price = first_price
         while price <= high:
             markets.append(f'INXDU-{ticker}-T{price}')
@@ -235,9 +232,11 @@ Finds all prices that a Kalshi above below nasdaq market could exist at between 
 def find_nd_daily_above_below_prices(markets, high_prices, low_prices, market_tickers):
     
     for high, low, ticker in zip(high_prices, low_prices, market_tickers):
-            
+        
+        #find the lowest price below the low
         first_price = float(str(int(str(low)[:3])-1)+'99.99')
         
+        #work up by 100 points to the high
         price = first_price
         while price <= high:
             markets.append(f'NASDAQ100DU-{ticker}-T{price}')
@@ -332,8 +331,8 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
     not_repeated = True
     initial = True
     data_dict = []
-    #the idea is basically we get data. if the last timestamp of the previous data was after the first time stamp of the next, stop and don't add
     
+    #go through the data until we've reached the end of the day and start to repeat
     while not_repeated:
         if initial:
             data = account.get_market_history(ticker=market, limit=1000, min_ts=start_timestamp, max_ts=end_timestamp)
@@ -342,28 +341,30 @@ def create_csv(account: ExchangeClient, market: str, start_date: dt, end_date: d
         else:
             data = account.get_market_history(ticker=market, limit=1000, cursor=data_cursor, min_ts=start_timestamp, max_ts=end_timestamp)
         
+        #when timestamps reset, we know we've begun to repeat
         current_ts = data['history'][-1]['ts']
         if last_ts >= current_ts:
             not_repeated = False
             continue
         
+        #add all of the data to our data_dict and find the cursor to make the next api call
         data_dict = data_dict + data['history']
         data_cursor = data['cursor']
         last_ts = current_ts
 
-    
     if len(data_dict) == 0:
         raise Exception('Your API call has returned no data')
-    
-    field_names = ['datetime', 'bid', 'ask', 'open_interest', 'volume']
 
+    #for testing this function alone without the larger wrapper
     if csv_name is None:
         csv_name = f'data_storage/kalshi_data/{market}_{start_date}_{end_date}.csv'
             
-
+    field_names = ['datetime', 'bid', 'ask', 'open_interest', 'volume']
+    
+    ''' 
+    Open "path" for writing, creating any parent directories as needed.
+    '''
     def safe_open_w(path):
-        ''' Open "path" for writing, creating any parent directories as needed.
-        '''
         os.makedirs(os.path.dirname(path), exist_ok=True)
         return open(path, 'w')
     
@@ -397,19 +398,22 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print('connecting to kalshi api')
     account = start_kalshi_api()
     markets = get_sub_markets(market, start_date, end_date)
-    
     print('acquired sub markets', markets)
+    
     total_trials = 0
     successes = 0
     errors = 0
     
     for mkt_string in markets:
+        
+        #create the csv name from the mkt_string
         mkt_prefix, date, price = re.findall(r'[a-zA-z0-9]+', mkt_string)
         year = date[:2]
         month = date[2:5]
         day = date[-2:]
         csv_name = f'data_storage/kalshi_data/{mkt_prefix}/{year}/{month}/{day}/{mkt_string}.csv'
         
+        #create the start and end times for the current day
         date_year = int('20'+year)
         
         if month == "JAN":
@@ -444,11 +448,13 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
         
         start = dt(date_year, date_month, date_day, 9, 30, 0)
         
+        #if this day is the first day in the range, update the end time
         if start_date.year == date_year and start_date.month == date_month and start_date.day == date_day:
             start = dt(date_year, date_month, date_day, start_date.hour, start_date.minute, start_date.second)
         
         end = dt(date_year, date_month, date_day, 16, 0, 0)
         
+        #if this day is the last day in the range, update the end time
         if end_date.year == date_year and end_date.month == date_month and end_date.day == date_day:
             end = dt(date_year, date_month, date_day, end_date.hour, end_date.minute, end_date.second)
         
