@@ -1,6 +1,6 @@
 # Algorithmic Trading on Kalshi
 
-Elie Cuevas, Jake Jones
+Jake Jones, Elie Cuevas, Nikhil Kakarla
 
 Our goal is to begin trading systemmatically on Kalshi, an event contract exchange. 
 
