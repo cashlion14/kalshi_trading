@@ -13,10 +13,11 @@ import backtrader.feeds as btfeeds
 import csv
 import datetime
 import argparse
+import os
 
-
+datapaths = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk('data_storage/kalshi_data/INXZ') for f in filenames]
 # datapath = 'data_storage/kalshi_data/INXDU-23AUG15-T4499.99_2023-08-15 09:00:00_2023-08-15 10:23:20.csv'
-datapath = 'data_storage/kalshi_data/INXD/23/DEC/20/INXD-23DEC20-B4687.csv'
+# datapath = 'data_storage/kalshi_data/INXD/23/DEC/20/INXD-23DEC20-B4687.csv'
 
 
 class TestStrategy(bt.Strategy):
