@@ -71,7 +71,7 @@ def market_to_kalshi_dates(market_days: list) -> list:
         year = str(market_day.year)[-2:]
         
         month = market_day.month
-        month = months[month]
+        month = months[month-1]
 
         day = market_day.day
         if day < 10:
@@ -390,6 +390,7 @@ Assumes market is not currently open.
 
 Known issues:
     Up/down markets are not open some days due to low vol, which means ~1/3 days throw errors
+    Up/down markets began on August 1st, 2023
     Nasdaq 2022 yearly range market does not have enough vol
     Some random SPX days use ticker INDW instead of INDX, causing some errors
     Above/Below markets only began on June 23rd, 2023
@@ -400,7 +401,7 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print('connecting to kalshi api')
     account = start_kalshi_api()
     markets = get_sub_markets(market, start_date, end_date)
-    print('acquired sub markets', markets)
+    print('acquired sub markets')
     
     total_trials = 0
     successes = 0
@@ -409,7 +410,7 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     for mkt_string in markets:
         
         #create the csv name from the mkt_string
-        mkt_prefix, date, price = re.findall(r'[a-zA-z0-9]+', mkt_string)
+        mkt_prefix, date, price = re.findall(r'[a-zA-z0-9.]+', mkt_string)
         year = date[:2]
         month = date[2:5]
         day = date[-2:]
@@ -472,5 +473,5 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print(f'The error rate for {market} between {start_date} and {end_date} was {round(errors/total_trials, 0)}')
 
 if __name__ == "__main__":
-    # create_index_market_csvs(IndexMarket.SpDailyRange, dt(2023, 12, 20, 9, 30, 0), dt(2023, 12, 22, 16, 0, 0), IndexInterval.OneMin)
+    # create_index_market_csvs(IndexMarket.SpUpDown, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
     pass
