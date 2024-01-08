@@ -20,10 +20,12 @@ Our goal is to begin trading systemmatically on Kalshi, an event contract exchan
     
 Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade. Use cloud service to run server. Use Kalshi API: https://kalshi.com/api? to connect to exchange.
 
-**Idea Generation:**
-1. Market making
-2. HFT (get ahead of S&P contract changes)
-3. EOD/Microstructure trades (look for patterns at open, close, etc)
-4. Hedge options using Kalshi exchange
-5. Find further ideas here: https://medium.com/@mlblogging.k/10-awesome-books-for-quantitative-trading-fc0d6aa7e6d8
-6. Arbitrage: yes_ask + yes_bid < 100
+**Trading Strategies:**
+1. Single-market arbigtrage
+2. High freuquency trading
+3. ML predictions
+4. Options hedging
+5. Rebate farming
+6. Volatility hedging
+
+https://medium.com/@mlblogging.k/10-awesome-books-for-quantitative-trading-fc0d6aa7e6d8
