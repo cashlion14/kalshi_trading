@@ -21,8 +21,10 @@ Our goal is to begin trading systemmatically on Kalshi, an event contract exchan
 Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade. Use cloud service to run server. Use Kalshi API: https://kalshi.com/api? to connect to exchange.
 
 **Trading Strategies:**
-1. Single-market arbigtrage
+1. Single-market arbitrage
+    a. Prices lower at beginning of day, buy early and look for no later
 2. High freuquency trading
+    a. At EOD if we are away from boundary, just buy up the 96 markets
 3. ML predictions
 4. Options hedging
 5. Rebate farming
