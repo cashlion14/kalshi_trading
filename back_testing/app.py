@@ -28,7 +28,7 @@ class TestStrategy(bt.Strategy):
         ''' Logging function for this strategy'''
         
         if txt:
-            print(txt)
+            # print(txt)
             return
         
         logString = ''
@@ -36,7 +36,7 @@ class TestStrategy(bt.Strategy):
         logString += str(self.datetime.date()) + ' ' + str(self.datetime.time())
         logString += "\t| Ask: " +  str(self.data.open[0]) + "\t| Vol: " + str(self.data.volume[0])
         
-        print(logString)
+        # print(logString)
     
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -123,30 +123,34 @@ class TestStrategy(bt.Strategy):
 
 
 if __name__ == '__main__':
-    
-    cerebro = bt.Cerebro()
-    cerebro.broker.setcash(100000.0)
-                        
+    finalVals = []
+    for i in range(len(datapaths)):
+        cerebro = bt.Cerebro()
+        cerebro.broker.setcash(100000.0)
+                            
 
-    data = btfeeds.GenericCSVData(
-        dataname=datapath,
-        datetime=0, #numbers are the index of the CSV file where the information is located
-        open=2,
-        high=2,
-        low=2,
-        close=2,
-        volume=4,
-        openinterest=-1,
-        dtformat=('%Y-%m-%d %H:%M:%S'), #datetime format should be standard
-        timeframe=bt.TimeFrame.Minutes, #converts from days to minutes/seconds for the time
-        compression=60,
-    )
+        data = btfeeds.GenericCSVData(
+            dataname=datapaths[i],
+            datetime=0, #numbers are the index of the CSV file where the information is located
+            open=2,
+            high=2,
+            low=2,
+            close=2,
+            volume=4,
+            openinterest=-1,
+            dtformat=('%Y-%m-%d %H:%M:%S'), #datetime format should be standard
+            timeframe=bt.TimeFrame.Minutes, #converts from days to minutes/seconds for the time
+            compression=60,
+        )
 
 
-    cerebro.addstrategy(TestStrategy)
-    cerebro.adddata(data)
+        cerebro.addstrategy(TestStrategy)
+        cerebro.adddata(data)
 
-    print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
-    
-    cerebro.run()
-    print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+        # print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
+        
+        cerebro.run()
+        finalVals.append(cerebro.broker.getvalue())
+        print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+        
+    print(sum(finalVals)/len(finalVals))
