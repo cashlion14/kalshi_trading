@@ -13,6 +13,21 @@ import scipy
 from scipy.interpolate import make_interp_spline
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
+
+"""Uses code from the websites 
+        "https://reasonabledeviations.com/2020/10/01/option-implied-pdfs/"
+        "https://reasonabledeviations.com/2020/10/10/option-implied-pdfs-2/"
+
+    Attempt is to use options prices on the S&P500 to create an implied PDF
+    We could then compare this pdf/cdf to the kalshi prices and look for arbitrage opporunties
+
+    Returns:
+        _type_: _description_
+"""
+
+
+
+
 # Pricing Based on Implied Volatily (NOT INVESTMENT ADVICE, JUST FOR DEMONSTRATION PURPOSES)
 def vol_by_strike(polymdl, K):
     return np.poly1d(polymdl)(K)
@@ -28,15 +43,17 @@ def binary_call(S, K, T, r, sigma, Q=1):
     N = norm.cdf
     return np.exp(-r*T)* N(d2(S,K,T,r,sigma)) *Q
 
+
+#pull from yahoo finance
 exp_date = '2024-01-10'
-SAP500 = yf.Ticker("^SPX")
-print()
+SAP500 = yf.Ticker("^NDX")
 data = SAP500.option_chain(exp_date)
 calls = data.calls
+print(calls)
 
 #max and min range to pull the data from
-minRange = 4575
-maxRange = 4925
+minRange = 16000
+maxRange = 17300
 
 #get prices at different strike values
 vol_vals = calls.impliedVolatility.values #volatility values
@@ -84,7 +101,7 @@ print(len(strike_vals),len(clippedPrices),len(lowessPrices))
 simplifiedStrikes = []
 simplifiedPrices = []
 for i in range(len(strike_vals)):
-    if i % 8 == 0:
+    if i % 3 == 0:
         simplifiedStrikes.append(strike_vals[i])
         simplifiedPrices.append(lowessPrices[i])
 
@@ -93,7 +110,7 @@ for i in range(len(strike_vals)):
 poly = scipy.interpolate.interp1d(simplifiedStrikes, simplifiedPrices, kind="cubic",
                                  fill_value="extrapolate")
 
-polyDeriv = poly._spline.derivative(nu=2)
+polyDeriv = poly._spline.derivative(nu=1)
 
 
 #plot results
