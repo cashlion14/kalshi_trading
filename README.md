@@ -31,3 +31,6 @@ Use Python library BackTrader: https://www.backtrader.com/ to backtest & trade. 
 6. Volatility hedging
 
 https://medium.com/@mlblogging.k/10-awesome-books-for-quantitative-trading-fc0d6aa7e6d8
+https://wrds-www.wharton.upenn.edu/
+https://www.openassetpricing.com/
+https://www.fullerthalerfunds.com/
