@@ -1,1 +1,0 @@
-Elie ; market_processing/ ; find ways of getting intraday pricing further back than 30 days. free or cheap

@@ -1,5 +1,6 @@
 from datetime import datetime as dt
 from datetime import timedelta
+from datetime import time
 from enum import Enum
 import csv
 import yfinance as yf
@@ -473,5 +474,10 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print(f'The error rate for {market} between {start_date} and {end_date} was {round(errors/total_trials, 0)}')
 
 if __name__ == "__main__":
-    # create_index_market_csvs(IndexMarket.SpUpDown, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
+    # create_index_market_csvs(IndexMarket.SpDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
     pass
+    a = time(15, 45, 0)
+    b = dt(2023, 12, 3, 16, 0, 0)
+    c = b.time()
+    print(a, c)
+    print( a < c)
