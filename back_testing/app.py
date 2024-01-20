@@ -14,8 +14,10 @@ import csv
 import datetime
 import argparse
 import os
+from datetime import datetime as dt
+from datetime import time
 
-datapaths = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk('data_storage/kalshi_data/INXZ') for f in filenames]
+datapaths = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk('data_storage/kalshi_data/INXD') for f in filenames]
 # datapath = 'data_storage/kalshi_data/INXDU-23AUG15-T4499.99_2023-08-15 09:00:00_2023-08-15 10:23:20.csv'
 # datapath = 'data_storage/kalshi_data/INXD/23/DEC/20/INXD-23DEC20-B4687.csv'
 
@@ -96,37 +98,55 @@ class TestStrategy(bt.Strategy):
         # Check if we are in the market
         if not self.position:
 
-            # Not yet ... we MIGHT BUY if ...
-            if self.dataclose[0] < self.dataclose[-1]:
-                    # current close less than previous close
+            # # Not yet ... we MIGHT BUY if ...
+            # if self.dataclose[0] < self.dataclose[-1]:
+            #         # current close less than previous close
 
-                    if self.dataclose[-1] < self.dataclose[-2]:
-                        # previous close less than the previous close
+            #         if self.dataclose[-1] < self.dataclose[-2]:
+            #             # previous close less than the previous close
 
-                        # BUY, BUY, BUY!!! (with default parameters)
-                        self.log('BUY CREATE, %.2f' % self.dataclose[0])
+            #             # BUY, BUY, BUY!!! (with default parameters)
+            #             self.log('BUY CREATE, %.2f' % self.dataclose[0])
 
-                        # Keep track of the created order to avoid a 2nd order
-                        self.order = self.buy()
+            #             # Keep track of the created order to avoid a 2nd order
+            #             self.order = self.buy()
+            
+            
+            
+            if self.datetime.time() > time(15, 45, 0) and self.dataclose[0] > 85 and self.dataclose[0] < 95:
+                # BUY, BUY, BUY!!! (with default parameters)
+                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+
+                # Keep track of the created order to avoid a 2nd order
+                self.order = self.buy()
 
         else:
-
-            # Already in the market ... we might sell
-            if len(self) >= (self.bar_executed + 5):
+            
+            if self.datetime.time() > time(15, 55, 0) and self.dataclose[0] > 95:
                 # SELL, SELL, SELL!!! (with all possible default parameters)
                 self.log('SELL CREATE, %.2f' % self.dataclose[0])
 
                 # Keep track of the created order to avoid a 2nd order
                 self.order = self.sell()
+                
+
+
+            # # Already in the market ... we might sell
+            # if len(self) >= (self.bar_executed + 5):
+            #     # SELL, SELL, SELL!!! (with all possible default parameters)
+            #     self.log('SELL CREATE, %.2f' % self.dataclose[0])
+
+            #     # Keep track of the created order to avoid a 2nd order
+            #     self.order = self.sell()
 
 
 
 
 if __name__ == '__main__':
     finalVals = []
-    for i in range(len(datapaths)):
+    for i, name in enumerate(datapaths):
         cerebro = bt.Cerebro()
-        cerebro.broker.setcash(100000.0)
+        cerebro.broker.setcash(500.0)
                             
 
         data = btfeeds.GenericCSVData(
@@ -151,6 +171,6 @@ if __name__ == '__main__':
         
         cerebro.run()
         finalVals.append(cerebro.broker.getvalue())
-        print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
+        print(f'Final Portfolio Value: {cerebro.broker.getvalue()} {name}' )
         
     print(sum(finalVals)/len(finalVals))
