@@ -13,19 +13,8 @@ SELL_PRICE = 98         #price at which to always sell in order to lock in profi
 LOSS_FLOOR = 10         #amount that, if the price drops this much below our buy price, we sell to mitigate losses 
 KALSHI_INTERVAL_SIZE = 25
 
-def checkTradeStatus():
-    current_time = datetime.now()
-    
-    
-    
-    #variables we need
-    #Kalshi: current market ask_low, ask_high, sell_price 
-    #S&p: current value, open value, 
-    # OTHER: current time,
 
 months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-
-# if current_time < time(16, 0 , 0) and current_time > time(9,30,0):
 
 #get S&P data
 
@@ -99,8 +88,7 @@ def decideSell(current_time, kalshi_bid, kalshi_ask, have_bought):
     
     return False
             
-              
-        
+             
 def buy_kalshi():
     pass
         
@@ -110,6 +98,8 @@ def sell_kalshi():
 # print(event_response)
 
 if __name__ == "__main__":
+    
+    # if current_time < time(16, 0 , 0) and current_time > time(9,30,0):
     
     have_bought = False
     have_sold = False
