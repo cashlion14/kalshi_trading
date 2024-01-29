@@ -39,7 +39,9 @@ def get_stock_info(df, year, month, day, buy_minute):
     return open, close, fifbefore
 
 def eod_backtester(buy_minute, sell_minute, capital_ratio, interval_ratio, ask_low, ask_high, percent_change, buy_price, bought_floor):
-    capital = 100
+    capital = 500
+    total_return = 0
+    total_loss = 0
     p_days = 0
     l_days = 0
     losses = []
@@ -198,6 +200,7 @@ if __name__ == "__main__":
     bid_price = 98
     #if its dropping how far below buy do u wait to sell
     bought_floor = 10
+    
     print(eod_backtester(buy_minute, sell_minute, capital_ratio, interval_ratio, ask_low, ask_high, percent_change, bid_price, bought_floor))
     # max_capital = [0]
     # index = 0

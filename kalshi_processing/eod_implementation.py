@@ -34,8 +34,11 @@ def getKalshiData(current_datetime, SAP_current):
     year = current_datetime.strftime("%y")
 
     exchange_client = start_kalshi_api()
-    kalshi_ticker = 'INXD-' + year + month + day
+    kalshi_ticker = 'INX-' + year + month + day
+    print('Kalshi Ticker:', kalshi_ticker)
     event_response = exchange_client.get_markets(event_ticker=kalshi_ticker)
+
+    # print(event_response)
 
     market_bids = dict()
     market_asks = dict()
@@ -109,13 +112,19 @@ if __name__ == "__main__":
     current_datetime = datetime.now()
     
     SAP_open, SAP_current = getSAPData()
+    print('SAP Data:',SAP_open, SAP_current)
+    
     current_capital, kalshi_midpoint, kalshi_bid, kalshi_ask = getKalshiData(current_datetime,SAP_current)
 
-    if not have_bought:
-        have_bought, bought_price = decideBuy(current_datetime.time(),current_capital, kalshi_midpoint, kalshi_bid, kalshi_ask, SAP_open, SAP_current, have_bought)
+    print('kalshi data (mid,bid,ask)', kalshi_midpoint, kalshi_bid, kalshi_ask)
+
+
+
+    # if not have_bought:
+    #     have_bought, bought_price = decideBuy(current_datetime.time(),current_capital, kalshi_midpoint, kalshi_bid, kalshi_ask, SAP_open, SAP_current, have_bought)
         
-    if not have_sold:    
-        have_sold = decideSell()
+    # if not have_sold:    
+    #     have_sold = decideSell()
     
 
     
