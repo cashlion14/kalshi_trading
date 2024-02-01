@@ -149,8 +149,8 @@ def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list,
                 first_price = int(str(low)[:2]+'75')
             
             #work up to the high price
-            price = first_price
-            while price <= high:
+            price = first_price-50
+            while price <= high+50:
                 markets.append(f'INXD-{ticker}-B{price}')
                 price += 50
                 
@@ -167,8 +167,8 @@ def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list,
                 first_price = int(str(low)[:2]+'87')
             
             #work up to the high price
-            price = first_price
-            while price <= high:
+            price = first_price-25
+            while price <= high+25:
                 markets.append(f'INXD-{ticker}-B{price}')
                 price += 25
                 
@@ -474,10 +474,5 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print(f'The error rate for {market} between {start_date} and {end_date} was {round(errors/total_trials, 0)}')
 
 if __name__ == "__main__":
-    # create_index_market_csvs(IndexMarket.SpDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
+    create_index_market_csvs(IndexMarket.SpDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
     pass
-    a = time(15, 45, 0)
-    b = dt(2023, 12, 3, 16, 0, 0)
-    c = b.time()
-    print(a, c)
-    print( a < c)
