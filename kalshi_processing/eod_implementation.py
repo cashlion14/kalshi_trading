@@ -88,11 +88,11 @@ def getKalshiData(current_datetime, SAP_current):
         event_ticker = event['ticker']
         if event_ticker[-5] == 'B':
             
+        
             market_orderbook = exchange_client.get_orderbook(event_ticker)['orderbook']['yes']
             
             
             if market_orderbook != None:
-                print(market_orderbook)
                 market_data = market_orderbook[-1]
                 market_bid = market_data[0]
                 market_vol = market_data[1]
