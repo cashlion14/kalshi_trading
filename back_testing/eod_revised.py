@@ -101,10 +101,21 @@ def find_current_and_nearest_market(datapaths, current_price):
 """
 Print out what trades happened on a given day
 """
-def print_day_summary(capital, trade_capital, trade_return, bought_price, sold_price, day):
+def print_day_summary(capital, trade_capital, trade_return, bought_price, sold_price, day, market, bought_middle, bought_edge, bought_twice, sold): 
+    if bought_middle:
+        bought_type = 'Bought in Middle Section'
+    if bought_edge:
+        bought_type = 'Bought in Edge Section'
+    if bought_twice:
+        bought_type = 'Bought in Middle Section and then Bought Next Section'
+    if sold:
+        bought_type = 'Bought in Middle Section and then Sold'
+    
     print('Day:', day)
+    print('Trade Type:', bought_type)
+    print('Market:', market[40:58])
     print('Bought', trade_capital, 'contracts at', bought_price)
-    print('Sold at', sold_price, "creating a return of", 100*(round(trade_return - trade_capital,2)/trade_capital), '%')
+    print('Sold at', sold_price, "creating a return of", round(100*(round(trade_return - trade_capital,2)/trade_capital), 2), '%')
     print('Ending capital:', capital)
     print('------------------------------------')
 
@@ -171,8 +182,6 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
         higher_df.reset_index()
         higher_df['datetime']= pd.to_datetime(higher_df['datetime'])
         higher_df = higher_df.set_index('datetime')
-        print(entry)
-        print(capital)
         
         #get the middle price of the kalshi_market
         last_slash = 0
@@ -189,6 +198,7 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
         bought_twice = False
         current_spx = decision_price
         sold = False
+        sold_price = None
         
         #go through each entry in database
         for index, row in middle_df.iterrows():
@@ -218,12 +228,19 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
                 if bought_middle and not is_in_middle_range:
                     higher = current_spx - kalshi_middle_price > 0
                     side_ask = higher_ask if higher else lower_ask
-                    if abs(current_spx - kalshi_middle_price) > 10 and bought_price + side_ask < 98 and not sold:
+                    if abs(current_spx - kalshi_middle_price) > 10 and bought_price + side_ask < 98 and not sold and not bought_twice:
                         bought_price += side_ask
                         bought_twice = True
                     elif not sold and not bought_twice and middle_ask < bought_price-bought_floor:
-                        sold = True
-                        sold_price = middle_bid
+                        sell_loss = middle_bid - bought_price
+                        double_loss = 100 - bought_price - side_ask
+            
+                        if sell_loss > double_loss:
+                            sold = True
+                            sold_price = middle_bid
+                        else:
+                            bought_twice = True
+                            bought_price += side_ask
         
         #determine final profitability
         if bought_middle or bought_edge:
@@ -233,7 +250,7 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
                 if bought_twice:
                     percent_return = 1 + (100-bought_price)/100
                     trade_return = trade_capital * percent_return
-                if sold:
+                elif sold:
                     percent_return = 1 + (sold_price-bought_price)/100
                     trade_return = trade_capital * percent_return
                 else:
@@ -251,12 +268,15 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
             if trade_return < trade_capital:
                 p_losses += 1
                 loss_dayes.append(entry)
+                
+            if sold_price is None:
+                sold_price = 100
+            print_day_summary(capital, trade_capital, trade_return, bought_price, sold_price, entry, middle, bought_middle, bought_edge, bought_twice, sold)
     
     return capital, 100*(p_losses/trading_days), 100*(trading_days/total_days), loss_dayes
              
-            
-            
-    
-        
+                 
 if __name__ == "__main__":
     print(eod_strategy_revised(50, 5, 70, 97, 2, 100, 10, 2))
+    
+    
