@@ -42,7 +42,7 @@ class Kalshi_Market:
         return str(self.ticker) + ' (bid,ask,vol): ' + str(self.bid) + ', ' + str(self.ask) + ', ' + str(self.vol)
 
 def getSAPData():
-    # print('getting S&P data')
+    print('getting S&P data')
     SAP_history = yf.download(tickers="^SPX", period="1d", interval="1m")
     # print('got SAP data')
     SAP_open = SAP_history['Open'].iloc[0]
@@ -52,7 +52,7 @@ def getSAPData():
 def takeSAPScreenshot():
     ss_region = (150,210, 250, 270)
     ss_img = ImageGrab.grab(ss_region)
-    # ss_img.show()
+    ss_img.show()
 
     num = str(ocr.image_to_string(ss_img))
 

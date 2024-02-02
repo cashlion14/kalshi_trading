@@ -336,3 +336,7 @@ def start_kalshi_api():
     exchange_client = ExchangeClient(exchange_api_base = "https://trading-api.kalshi.com/trade-api/v2", email = os.getenv('KEMAIL'), password = os.getenv('KPW'))
     return exchange_client
 
+def start_demo_api():
+    load_dotenv()
+    exchange_client = ExchangeClient(exchange_api_base = "https://demo-api.kalshi.co/trade-api/v2", email = os.getenv('KDEMOEMAIL'), password = os.getenv('KDEMOPW'))
+    return exchange_client
