@@ -10,24 +10,29 @@ import re
 
 import sched, time
 import uuid
+import logging
+import requests
 
 
 DEMO_MODE = False
+PAPER_TRADE = False
+TESTING = False
+FAKE_DATA = False
 
-BUY_MINUTE = 55         # first minute (3:xx PM) we allow to buy 
+BUY_MINUTE = 50         # first minute (3:xx PM) we allow to buy 
 SELL_MINUTE = 56        # first minute (3:xx PM) we allow to sell
-CAPTIAL_PERCENTAGE = 20 # percentage of our capital to bet on each trade
-INTERVAL_RATIO = 8      # #divide by 10, its the percent of the range youd buy in (in the middle)
+CAPTIAL_PERCENTAGE = .2 # percentage of our capital to bet on each trade
+INTERVAL_RATIO = 5      # #divide by 10, its the percent of the range youd buy in (in the middle)
 ASK_LOW = 70            #minumum price to buy stock at
 ASK_HIGH = 97           #maximum price to buy stock at
 PERCENT_CHANGE = 2      #maximum percent change of the S&P below which we will buy on that day (volatility control)
 SELL_PRICE = 98         #price at which to always sell in order to lock in profit
 LOSS_FLOOR = 10         #amount that, if the price drops this much below our buy price, we sell to mitigate losses 
-KALSHI_INTERVAL_SIZE = 25
-
+KALSHI_INTERVAL_SIZE = 13
+ARB_VAL = 97
 
 months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-
+SAP_Data = [4970,4970,4970,4990]
 
 
 class Kalshi_Market:
@@ -44,15 +49,19 @@ class Kalshi_Market:
 def getSAPData():
     print('getting S&P data')
     SAP_history = yf.download(tickers="^SPX", period="1d", interval="1m")
-    # print('got SAP data')
+    print('got SAP data')
     SAP_open = SAP_history['Open'].iloc[0]
-    SAP_current = takeSAPScreenshot()
+    
+    if FAKE_DATA:
+        SAP_current = 0
+    else:
+        SAP_current = takeSAPScreenshot()
     return SAP_open, SAP_current
 
 def takeSAPScreenshot():
     ss_region = (150,210, 250, 270)
     ss_img = ImageGrab.grab(ss_region)
-    ss_img.show()
+    # ss_img.show()
 
     num = str(ocr.image_to_string(ss_img))
 
@@ -62,17 +71,12 @@ def takeSAPScreenshot():
     return SAPVal
 
 
-def getKalshiData(current_datetime, SAP_current):
+def getKalshiData(exchange_client,current_datetime, SAP_current):
     #Get Kalshi Data
     day = current_datetime.strftime("%d")
     month_num = int(current_datetime.strftime("%m"))
     month = months_array[month_num - 1]
     year = current_datetime.strftime("%y")
-
-    if DEMO_MODE:
-        exchange_client = start_demo_api()
-    else:
-        exchange_client = start_kalshi_api()
         
     
     kalshi_ticker = 'INX-' + year + month + day
@@ -116,11 +120,20 @@ def getKalshiData(current_datetime, SAP_current):
     # print([i.ticker for i in kalshi_markets])
     
     closest_market = kalshi_markets[closest_market_index]
-    market_below = kalshi_markets[closest_market_index+1]
-    market_above = kalshi_markets[closest_market_index-1]
     
-    return closest_market, market_below, market_above
     
+    if closest_market_index+1 >= len(kalshi_markets):
+        market_below = None
+    else:
+        market_below = kalshi_markets[closest_market_index+1]
+        
+    if closest_market_index - 1 < 0:
+        market_above = None
+    else:
+        market_above = kalshi_markets[closest_market_index-1]
+    
+    
+    return closest_market, market_below, market_above   
     print(closestMarket.ticker)
             
     # kalshi_bid = market_bids[closestMarket]
@@ -131,55 +144,82 @@ def getKalshiData(current_datetime, SAP_current):
     # return kalshi_ticker, kalshi_midpoint, kalshi_bid, kalshi_ask, exchange_client
 
 
-
-def decideBuy(current_time, current_capital, kalshi_midpoint, kalshi_bid, kalshi_ask, SAP_open, SAP_current, have_bought, exchange_client):
-    if current_time > Time(15,BUY_MINUTE,0):
-        #if price is in ask range
-        if kalshi_ask > ASK_LOW and kalshi_ask < ASK_HIGH:
-            #if S&P price is within the middle interval_ratio of the market range
-            if abs(SAP_current - kalshi_midpoint) < KALSHI_INTERVAL_SIZE*INTERVAL_RATIO:
-                #if the S&P hasn't moved more than percent_change in the day and haven't bought yet
-                if 100*(abs(SAP_open-SAP_current)/SAP_open) < PERCENT_CHANGE and not have_bought:
-                    amt = current_capital*CAPTIAL_PERCENTAGE
-                    side = 'yes'
-                    buy_kalshi(amt,side,exchange_client)
-                    return True, kalshi_ask
-    return False, -1
-                    
-
-def decideSell(current_time, kalshi_bid, kalshi_ask, have_bought):
-    #if within sell time bounds
-    if current_time > time(15,SELL_MINUTE,0):
-        #if can sell above our threshold price or have lost loss_floor amount of money, sell
-        if (kalshi_bid > SELL_PRICE or kalshi_ask < bought_price - LOSS_FLOOR) and have_bought:
-            sell_kalshi()
-            return True
+def updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,higher_market):    
     
-    return False
-            
-             
-def buy_kalshi(amt, side,exchange_client):
-    print('buying kalshi')
-    # ticker = 
-    # order_params = {'ticker':ticker,
-    #                 'client_order_id':str(uuid.uuid4()),
-    #                 'type':'market',
-    #                 'action':'buy',
-    #                 'side':side,
-    #                 'count':amt}
-    # exchange_client.create_order(**order_params)
+    cur_event_response = exchange_client.get_orderbook(cur_market.ticker)
+    cur_yes_book = cur_event_response['orderbook']['yes']
+    cur_no_book = cur_event_response['orderbook']['no']
+    
+    cur_market.bid = cur_yes_book[-1][0]
+    cur_market.ask = 100 - cur_no_book[-1][0]
+    cur_market.vol = min(cur_yes_book[-1][1], cur_no_book[-1][1])
+    
+    #do for lower book
+    if lower_market is not None:
+        lower_event_response = exchange_client.get_orderbook(lower_market.ticker)
+        lower_yes_book = lower_event_response['orderbook']['yes']
+        lower_no_book = lower_event_response['orderbook']['no']
         
-def sell_kalshi():
-    pass
+        lower_market.bid = lower_yes_book[-1][0]
+        lower_market.ask = 100 - lower_no_book[-1][0]
+        lower_market.vol = min(lower_yes_book[-1][1], lower_no_book[-1][1])
+    
+    
+    #do for higher book
+    if higher_market is not None:
+        higher_event_response = exchange_client.get_orderbook(higher_market.ticker)
+        higher_yes_book = higher_event_response['orderbook']['yes']
+        higher_no_book = higher_event_response['orderbook']['no']
+        
+        higher_market.bid = higher_yes_book[-1][0]
+        higher_market.ask = 100 - higher_no_book[-1][0]
+        higher_market.vol = min(higher_yes_book[-1][1], higher_no_book[-1][1])
 
-# print(event_response)
+    return cur_market, lower_market, higher_market
+            
+        
+        
+def buy_kalshi(exchange_client,market,amt,side):
+
+    account = start_kalshi_api()
+    print('connected to kalshi')
+    print(account.get_exchange_status())
+    balance = account.get_balance()
+    print(balance)
+    positions = account.get_positions()
+    # print(positions) 
+
+    ticker = market.ticker
+    order_params = {'ticker':ticker,
+                    'client_order_id':str(uuid.uuid4()),
+                    'type':'market',
+                    'action':'buy',
+                    'side':side,
+                    'count':int(amt//100)}
+    
+    if not TESTING:
+        account.create_order(**order_params)
+        print('bought',amt,'of',side,'of',ticker)
+    else:
+        print('testing but would buy ',amt,'of',side,'of',ticker)
+    
+    
 
 
 def operate_kalshi():
     
-    have_bought = False
-    have_sold = False
-    bought_price = -1
+    
+    logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+    logging.info('So should this')
+
+    markets_set = False
+    
+    bought_middle = False
+    bought_edge = False
+    bought_twice = False
+    sold = False
+    sold_price = None
+    
     
     while True:
     
@@ -188,34 +228,95 @@ def operate_kalshi():
         current_time = current_datetime.time()
         
         
-        if current_time < Time(16,0) and current_time > Time(9,30):    
+        if DEMO_MODE:
+            exchange_client = start_demo_api()
+        else:
+            exchange_client = start_kalshi_api()
+        
+        
+        if TESTING or (current_time < Time(16,0) and current_time > Time(9,30)):    
             SAP_open, SAP_current = getSAPData()
             print('SAP Data (open, current):',SAP_open, SAP_current)
             
-            closest_market, market_below,market_above = getKalshiData(current_datetime,SAP_current)
-            print(market_below)
-            print(closest_market)
-            print(market_above)
+            
+            if not markets_set:
+                cur_market, lower_market,higher_market = getKalshiData(exchange_client,current_datetime,SAP_current)
+                markets_set = True
+            else:
+                cur_market, lower_market, higher_market = updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,higher_market)
+            
+            print(lower_market)
+            print(cur_market)
+            print(higher_market)
             
             
-            # if not have_bought:
-            #     have_bought, bought_price = decideBuy(current_datetime.time(),exchange_client.get_balance(), kalshi_midpoint, kalshi_bid, kalshi_ask, SAP_open, SAP_current, have_bought,exchange_client)
+            total_capital = exchange_client.get_balance()['balance']
+            
+
+            if TESTING or (current_time > Time(15,BUY_MINUTE,0) and current_time < Time(16,0,0)):
+                print('is in time range')
+                middle_bid, middle_ask = cur_market.bid, cur_market.ask
+                if lower_market is not None:
+                    lower_bid, lower_ask = lower_market.bid, lower_market.ask
+                if higher_market is not None:
+                    higher_bid, higher_ask = higher_market.bid, higher_market.ask
                 
+                kalshi_midpoint = cur_market.midpoint
+                is_in_middle_range = abs(SAP_current-kalshi_midpoint) < KALSHI_INTERVAL_SIZE*(INTERVAL_RATIO/10)
+                print('is in middle range:',is_in_middle_range)
                 
-            # if have_bought and not have_sold:    
-            #     have_sold = decideSell(current_time, kalshi_bid, kalshi_ask, have_bought)
-        
-        
-        
-        else:
-            print('out of time range and reseting variables')
-            have_bought = False
-            have_sold = False
-            bought_price = -1
+                if not bought_middle and not bought_edge:
+                    if is_in_middle_range:
+                        if middle_ask < ASK_HIGH:
+                            if 100*(abs(SAP_open-SAP_current)/SAP_open) < PERCENT_CHANGE:
+                                buy_kalshi(exchange_client,cur_market, total_capital * CAPTIAL_PERCENTAGE, 'yes')
+                                bought_price = middle_ask
+                                bought_middle = True
+                    else:
+                        is_higher = SAP_current - kalshi_midpoint > 0
+                        side_ask = higher_ask if is_higher else lower_ask
+                        print('considering straddle buy with markets at', middle_ask, side_ask)
+                        if middle_ask + side_ask < ARB_VAL:
+                            bought_price = middle_ask + side_ask
+                            bought_edge = True
+                            buy_kalshi(exchange_client,cur_market, total_capital * CAPTIAL_PERCENTAGE/2, 'yes')
+                            buy_kalshi(exchange_client,higher_market if is_higher else lower_market, total_capital * CAPTIAL_PERCENTAGE/2, 'yes')
+                            
+                
+                elif bought_middle and not is_in_middle_range:
+                    higher = SAP_current - kalshi_midpoint > 0
+                    side_ask = higher_ask if higher else lower_ask
+                    
+                    
+                    if abs(SAP_current - kalshi_midpoint) > 10 and not sold and not bought_twice:
+                        print('considering loss arb with', bought_price, side_ask)
+                        if bought_price + side_ask < 98:
+                            bought_price += side_ask
+                            bought_twice = True
+                            buy_kalshi(exchange_client,higher_market if higher else lower_market,total_capital * CAPTIAL_PERCENTAGE, 'yes')
+                        
+                    elif middle_ask < bought_price - LOSS_FLOOR and not sold and not bought_twice:
+                        print('considering mitigating losses')
+                        sell_loss = middle_bid - bought_price
+                        double_loss = 100 - bought_price - side_ask
+                        
+                        print('sell loss: ', sell_loss, "double_loss: ", double_loss)
+                        if sell_loss > double_loss:
+                            sold = True
+                            sold_price = middle_bid
+                            buy_kalshi(exchange_client,cur_market,total_capital * CAPTIAL_PERCENTAGE,'no')
+                        else:
+                            bought_twice = True
+                            bought_price += side_ask
+                            buy_kalshi(exchange_client,higher_market if higher else lower_market,total_capital * CAPTIAL_PERCENTAGE, 'yes')
+            else:
+                print('not in time range')
 
         print('---------------------------')
-        time.sleep(15)
+        time.sleep(1)
     
 
 if __name__ == "__main__":
+    # market_object = Kalshi_Market('INX-24FEB14-B4962',4962,1,1,1)
+    # buy_kalsh2(start_kalshi_api(),market_object,100,'yes')
     operate_kalshi()
