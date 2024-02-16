@@ -474,5 +474,5 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
     print(f'The error rate for {market} between {start_date} and {end_date} was {round(errors/total_trials, 0)}')
 
 if __name__ == "__main__":
-    create_index_market_csvs(IndexMarket.SpDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
+    create_index_market_csvs(IndexMarket.NasdaqDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
     pass

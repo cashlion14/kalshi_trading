@@ -34,3 +34,7 @@ https://medium.com/@mlblogging.k/10-awesome-books-for-quantitative-trading-fc0d6
 https://wrds-www.wharton.upenn.edu/
 https://www.openassetpricing.com/
 https://www.fullerthalerfunds.com/
+
+
+NEXT STRATEGY: ARB BETWEEN RANGE AND ABOVE BELOW
+GET A BOUND ON STOCHASTIC PROCESS
