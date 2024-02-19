@@ -29,7 +29,7 @@ PERCENT_CHANGE = 2      #maximum percent change of the S&P below which we will b
 SELL_PRICE = 98         #price at which to always sell in order to lock in profit
 LOSS_FLOOR = 10         #amount that, if the price drops this much below our buy price, we sell to mitigate losses 
 KALSHI_INTERVAL_SIZE = 13
-ARB_VAL = 97
+ARB_VAL = 99
 
 months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
 SAP_Data = [4970,4970,4970,4990]
@@ -82,7 +82,7 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
     kalshi_ticker = 'INX-' + year + month + day
     print('Kalshi Ticker:', kalshi_ticker)
     event_response = exchange_client.get_markets(event_ticker=kalshi_ticker)
-
+    print(event_response)
     # print(event_response)
     
     kalshi_markets = []
@@ -120,7 +120,7 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
     # print([i.ticker for i in kalshi_markets])
     
     closest_market = kalshi_markets[closest_market_index]
-    
+    print(kalshi_markets)
     
     if closest_market_index+1 >= len(kalshi_markets):
         market_below = None
