@@ -64,10 +64,10 @@ def takeSAPScreenshot():
     # ss_img.show()
 
     num = str(ocr.image_to_string(ss_img))
-
+    # print(num)
+    
     temp = re.findall(r'\d+', num)
-    res = list(map(int, temp))
-    SAPVal = int(''.join([str(x) for x in res]))
+    SAPVal = int(''.join([str(x) for x in temp]))
     return SAPVal
 
 
@@ -80,14 +80,14 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
         
     
     kalshi_ticker = 'INX-' + year + month + day
+    kalshi_ticker = 'INX-' + year + month + '23'
     print('Kalshi Ticker:', kalshi_ticker)
     event_response = exchange_client.get_markets(event_ticker=kalshi_ticker)
-    print(event_response)
     # print(event_response)
     
     kalshi_markets = []
     
-
+    
     for event in event_response['markets']:
         event_ticker = event['ticker']
         if event_ticker[-5] == 'B':
@@ -108,6 +108,9 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
                 market_object = Kalshi_Market(event_ticker,midpoint,market_bid,market_ask,market_vol)
                 kalshi_markets.append(market_object)
         
+    # for market in kalshi_markets:
+    #     print(market)
+
         
     min_distance = 10000000    
     closest_market_index = -1
@@ -117,10 +120,7 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
             min_distance = abs(SAP_current - market_object.midpoint)
             closest_market_index = i
     
-    # print([i.ticker for i in kalshi_markets])
-    
     closest_market = kalshi_markets[closest_market_index]
-    print(kalshi_markets)
     
     if closest_market_index+1 >= len(kalshi_markets):
         market_below = None
@@ -134,14 +134,7 @@ def getKalshiData(exchange_client,current_datetime, SAP_current):
     
     
     return closest_market, market_below, market_above   
-    print(closestMarket.ticker)
-            
-    # kalshi_bid = market_bids[closestMarket]
-    # kalshi_ask = market_asks[closestMarket]
-    # print(kalshi_midpoint,kalshi_bid,kalshi_ask)
     
-    
-    # return kalshi_ticker, kalshi_midpoint, kalshi_bid, kalshi_ask, exchange_client
 
 
 def updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,higher_market):    
