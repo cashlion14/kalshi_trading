@@ -6,24 +6,6 @@ from datetime import time
 import os
 import re
 
-#every day
-#get the open, price near end, and close price
-#initial could be 
-
-#right now we are selling when the price drops. 
-#what if we instead sold it when it got closer to edge?
-#idea is what if we bought the market next door
-
-#go through each day
-#get open, close, min before price
-#find market it is in and the market it is near
-#run through the market that the price is in
-#write function to get nearest price in the other market
-
-#at a certain minute analyze whether to buy
-#then once that decision is made determine when or if to sell
-
-
 '''
 Finds all days on which the market is open between the start date and end date
 Returns a list of date objects
@@ -43,7 +25,6 @@ def get_market_days(start_date, end_date) -> list:
         days[index] = day.date()
     return days
 
-
 """
 Returns open, close, and current price of the s&p. Returns 0, 0, 0 if data unavailable.
 """
@@ -62,7 +43,6 @@ def get_stock_info(df, year, month, day, buy_minute):
         return 0, 0, 0 
     
     return open, close, fifbefore
-
 
 """
 Given markets and the current s&p price, returns path names for current market as well as market above and below.
@@ -103,13 +83,13 @@ Print out what trades happened on a given day
 """
 def print_day_summary(capital, trade_capital, trade_return, bought_price, sold_price, day, market, bought_middle, bought_edge, bought_twice, sold): 
     if bought_middle:
-        bought_type = 'Bought in Middle Section'
+        bought_type = 'Bought in Middle'
     if bought_edge:
-        bought_type = 'Bought in Edge Section'
+        bought_type = 'Bought in Edge'
     if bought_twice:
-        bought_type = 'Bought in Middle Section and then Bought Next Section'
+        bought_type = 'Bought in Middle and then Next'
     if sold:
-        bought_type = 'Bought in Middle Section and then Sold'
+        bought_type = 'Bought in Middle and then Sold'
     
     print('Day:', day)
     print('Trade Type:', bought_type)
@@ -132,6 +112,10 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
     p_losses = 0
     total_days = 0
     trading_days = 0
+    middle_days = 0
+    middle_twice_days = 0
+    middle_sold_days = 0
+    edge_days = 0
     
     market_days = get_market_days(dt(2023, 5, 19, 8, 0, 0), dt(2023, 12, 31, 17, 0, 0))
     months = ['JAN', 'FEB', "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
@@ -199,6 +183,7 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
         current_spx = decision_price
         sold = False
         sold_price = None
+        bought_markets = []
         
         #go through each entry in database
         for index, row in middle_df.iterrows():
@@ -217,20 +202,24 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
                 if is_in_middle_range:
                     if middle_ask > ask_low and middle_ask < ask_high and not bought_middle and not bought_edge and 100*(abs(open-close)/open) < percent_change:
                         bought_price = middle_ask
+                        bought_markets.append(int(middle[54:58]))
                         bought_middle = True
                 else:
-                    higher = current_spx - kalshi_middle_price > 0
-                    side_ask = higher_ask if higher else lower_ask
+                    above = current_spx - kalshi_middle_price > 0
+                    side_ask = higher_ask if above else lower_ask
                     if middle_ask + side_ask < 99 and not bought_middle and not bought_edge:
                         bought_price = middle_ask + side_ask
                         bought_edge = True
+                        bought_markets.append(int(middle[54:58]))
+                        bought_markets.append(int(higher[54:58]) if above else int(lower[54:58]))
                 
                 if bought_middle and not is_in_middle_range:
-                    higher = current_spx - kalshi_middle_price > 0
-                    side_ask = higher_ask if higher else lower_ask
+                    above = current_spx - kalshi_middle_price > 0
+                    side_ask = higher_ask if above else lower_ask
                     if abs(current_spx - kalshi_middle_price) > 10 and bought_price + side_ask < 98 and not sold and not bought_twice:
                         bought_price += side_ask
                         bought_twice = True
+                        bought_markets.append(int(higher[40:58]) if above else int(lower[54:58]))
                     elif not sold and not bought_twice and middle_ask < bought_price-bought_floor:
                         sell_loss = middle_bid - bought_price
                         double_loss = 100 - bought_price - side_ask
@@ -238,9 +227,11 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
                         if sell_loss > double_loss:
                             sold = True
                             sold_price = middle_bid
+                            bought_markets = []
                         else:
                             bought_twice = True
                             bought_price += side_ask
+                            bought_markets.append(int(higher[54:58]) if above else int(lower[54:58]))
         
         #determine final profitability
         if bought_middle or bought_edge:
@@ -248,7 +239,12 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
             trade_capital = capital * (capital_ratio/10)
             if bought_middle:
                 if bought_twice:
-                    percent_return = 1 + (100-bought_price)/100
+                    bought_markets.sort()
+                    range = [bought_markets[0]-13, bought_markets[1]+13]
+                    if close < range[0] or close > range[1]:
+                        percent_return = 0
+                    else:
+                        percent_return = 1 + (100-bought_price)/100
                     trade_return = trade_capital * percent_return
                 elif sold:
                     percent_return = 1 + (sold_price-bought_price)/100
@@ -260,23 +256,49 @@ def eod_strategy_revised(buy_minute, interval_ratio, ask_low, ask_high, percent_
                     else:
                         raise Exception('ruh roh')
             if bought_edge:
-                percent_return = 1 + (100-bought_price)/100
+                bought_markets.sort()
+                range = [bought_markets[0]-13, bought_markets[1]+13]
+                if close < range[0] or close > range[1]:
+                    percent_return = 0
+                else:
+                    percent_return = 1 + (100-bought_price)/100
                 trade_return = trade_capital * percent_return
-                
                 
             capital = capital + trade_return - trade_capital
             if trade_return < trade_capital:
                 p_losses += 1
                 loss_dayes.append(entry)
+            
+            if bought_middle and not bought_twice and not sold:
+                middle_days += 1
+            if bought_edge:
+                edge_days += 1
+            if bought_twice:
+                middle_twice_days += 1
+            if sold:
+                middle_sold_days += 1
                 
             if sold_price is None:
                 sold_price = 100
             print_day_summary(capital, trade_capital, trade_return, bought_price, sold_price, entry, middle, bought_middle, bought_edge, bought_twice, sold)
     
-    return capital, 100*(p_losses/trading_days), 100*(trading_days/total_days), loss_dayes
+    return capital, 100*(p_losses/trading_days), 100*(trading_days/total_days), 100*(middle_days/trading_days), 100*(middle_twice_days/trading_days), 100*(edge_days/trading_days), 100*(middle_sold_days/trading_days), loss_dayes
              
                  
 if __name__ == "__main__":
-    print(eod_strategy_revised(50, 5, 70, 97, 2, 100, 10, 2))
+    print(eod_strategy_revised(50, 5, 70, 97, 2, 100, 10, 10))
+
+    #where could we take losses
+    #if we buy middle:
+        #if we buy edge after:
+            #it could go through both (unlikely) or it could go back in the other direction
+        #if we sell
+        #if it doesn't land in the middle
+    #if we buy edge: 
     
+    #problem with backtester: it assumes profit rather than it jumping through both ranges
+    #need to fix that and do more testing to make strategy better
     
+    #so we can get a list of one or two bought markets and determine if close was in range
+    #can also see how much it is likely to jump and once it gets outside that, we can be sure about buying
+    #change arb price to 97?

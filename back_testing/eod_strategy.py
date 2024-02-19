@@ -190,7 +190,7 @@ if __name__ == "__main__":
     buy_minute = 55
     sell_minute = 56
     #divide by ten, is the ratio u multiply by to get the amount u put down every trade
-    capital_ratio = 2
+    capital_ratio = 10
     #divide by 10, its the percent of the range youd buy in (in the middle)
     interval_ratio = 8
     ask_low = 70

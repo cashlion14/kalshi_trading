@@ -30,7 +30,7 @@ for index, row in spx_prices.iterrows():
         new_day = False
         print(row['Time'])
     else:
-        if row['Time'].time() >= time(15, 55, 0) and row['Time'].time() <= time(16, 0, 0):
+        if row['Time'].time() >= time(15, 50, 0) and row['Time'].time() <= time(16, 0, 0):
             if row['Time'].date() != current_day:
                 new_day = True
                 did_today = False
@@ -41,7 +41,7 @@ for index, row in spx_prices.iterrows():
             if row['High'] > current_max:
                 current_max = row['High']
             
-            if current_max-current_min > 7 and not did_today:
+            if current_max-current_min > 20 and not did_today:
                 print(current_max, current_min)
                 jump_days += 1
                 did_today = True
@@ -50,3 +50,4 @@ print(100*(jump_days/total_days))
 
 #7 point jump ~10% of the time on last 5
 #20 point jump 0% on last 5, 3% on last 15
+#20 point jump ~1.2% on last 10
