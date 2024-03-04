@@ -22,29 +22,29 @@ class KalshiMarket:
     def __init__(self,ticker,midpoint,yeses, nos, market_type, size=100):
         self.ticker = ticker
         self.midpoint = midpoint
-        self.yeses = yeses
-        self.nos = nos
+        self.yeses = yeses[::-1]
+        self.nos = nos[::-1]
         self.size = size
         self.type = market_type
         
     #returns the best asking price and volume
     def get_best_yes_ask(self, volume=False):
         if volume:
-            return self.yeses[0][0], self.yeses[0][1]
-        else:
-            return self.yeses[0][0]
-
-    def get_best_yes_bid(self, volume=False):
-        if volume:
             return 100-self.nos[0][0], self.nos[0][1]
         else:
             return 100-self.nos[0][0]
+
+    def get_best_yes_bid(self, volume=False):
+        if volume:
+            return self.yeses[0][0], self.yeses[0][1]
+        else:
+            return self.yeses[0][0]
     
     def get_best_no_ask(self, volume=False):
         if volume:
-            return self.nos[0][0], self.nos[0][1]
+            return 100-self.yeses[0][0], self.yeses[0][1]
         else:
-            return self.nos[0][0]
+            return 100-self.yeses[0][0]
 
     def get_ticker(self):
         return self.ticker
@@ -347,7 +347,7 @@ class Strategy(Enum):
 ### UTILITY FUNCTIONS ###
 
 """
-Get NDX Open and Current Price
+Get NDX Open Price
 """
 def getIndexOpen(ticker="^NDX"):
     print(f'getting {ticker} open')
@@ -406,11 +406,8 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
             
         current_ticker = 'NASDAQ100-' + year + month + day + '-B' + str(current_index_price)[:3]+'50'
         
-        high_ticker = current_ticker
-        high_ticker[21] = str(int(current_ticker[21])+1)
-        
-        low_ticker = current_ticker
-        low_ticker[21] = str(int(current_ticker[21])-1)
+        high_ticker = current_ticker[:21] + str(int(current_ticker[21])+1) + current_ticker[22:]
+        low_ticker = current_ticker[:21] + str(int(current_ticker[21])-1) + current_ticker[22:]
         
         #create KalshiMarkets
         current_orderbook = account.get_orderbook(current_ticker)['orderbook']
@@ -428,7 +425,7 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
         else:
             current_market = KalshiMarket(current_ticker,midpoint,[],[], MarketType.Range)
         
-        high_orderbook = account.get_orderbook(current_ticker)['orderbook']
+        high_orderbook = account.get_orderbook(high_ticker)['orderbook']
         if high_orderbook is not None:
             yes_book = high_orderbook['yes']
             no_book = high_orderbook['no']
@@ -442,7 +439,7 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
         else:
             high_market = KalshiMarket(high_ticker,midpoint,[],[],MarketType.Range)
         
-        low_orderbook = account.get_orderbook(current_ticker)['orderbook']
+        low_orderbook = account.get_orderbook(low_ticker)['orderbook']
         if low_orderbook is not None:
             yes_book = low_orderbook['yes']
             no_book = low_orderbook['no']
@@ -471,7 +468,7 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
     
         range_markets = []
         for range_event in range_event_response['markets']:
-            range_event_ticker = event['ticker']
+            range_event_ticker = range_event['ticker']
             
             if range_event_ticker[-6] == 'B':
                 orderbook = account.get_orderbook(range_event_ticker)['orderbook']
@@ -483,13 +480,12 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
                     
                     market = KalshiMarket(range_event_ticker, midpoint, yes_orderbook, no_orderbook, MarketType.Range)
                     range_markets.append(market)
-        range_markets.reverse()
         
         above_event = 'NASDAQ100U-' + year + month + day
         above_event_response = account.get_markets(event_ticker=above_event)
         
         above_markets = []
-        for event in above_event_response['markets']:
+        for above_event in above_event_response['markets']:
             above_event_ticker = above_event['ticker']
             market_orderbook = account.get_orderbook(above_event_ticker)['orderbook']
             yes_orderbook = market_orderbook['yes']
@@ -500,7 +496,6 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
                 
                 above_market = KalshiMarket(above_event_ticker,strike_val, yes_orderbook, no_orderbook, MarketType.Above)
                 above_markets.append(above_market)
-        above_market.reverse()
         
         return range_markets, above_markets
        
@@ -603,19 +598,19 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
             range_market_yes_ask, range_market_yes_vol = range_market.get_best_yes_ask(volume=True)
             range_market_no_ask, range_market_no_vol = range_market.get_best_no_ask(volume=True)
             floor_market_yes_ask, floor_market_yes_vol = floor_market.get_best_yes_ask(volume=True)
-            floor_market_no_ask, floor_market_no_vol = floor_market.get_best_yes_ask(volume=True)
+            floor_market_no_ask, floor_market_no_vol = floor_market.get_best_no_ask(volume=True)
             ceiling_market_yes_ask, ceiling_market_yes_vol = ceiling_market.get_best_yes_ask(volume=True)
-            ceiling_market_no_ask, ceiling_market_no_vol = ceiling_market.get_best_yes_ask(volume=True)
+            ceiling_market_no_ask, ceiling_market_no_vol = ceiling_market.get_best_no_ask(volume=True)
             
             logging.info(f'Testing arbitrage opportunity 1, <$2, with a floor market yes of {floor_market_yes_ask}, a range market no of {range_market_no_ask} and a ceiling market no of {ceiling_market_no_ask}.')
             max_contracts_buyable = min(floor_market_yes_vol, range_market_no_vol, ceiling_market_no_vol)
-            if sum([floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100]) + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask) + calculateKalshiFee(max_contracts_buyable, range_market_no_ask) + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask) < 2:
+            if sum([floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100]) + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)/max_contracts_buyable < 2:
             
                 mod_capital = orderbook.get_mod_capital()
-                max_order_capital = (floor_market_yes_ask/100 + range_market_no_ask/100 + ceiling_market_no_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask) + calculateKalshiFee(max_contracts_buyable, range_market_no_ask) + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask)
+                max_order_capital = (floor_market_yes_ask/100 + range_market_no_ask/100 + ceiling_market_no_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)
             
                 trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100) 
-                
+            
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
@@ -626,13 +621,13 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
             
             logging.info(f'Testing arbitrage opportunity 2, <$1, with a floor market no of {floor_market_no_ask}, a range market yes of {range_market_yes_ask} and a ceiling market yes of {ceiling_market_yes_ask}.')
             max_contracts_buyable = min(floor_market_no_vol, range_market_yes_vol, ceiling_market_yes_vol)
-            if sum([floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100]) < 1:
+            if sum([floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100])  + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)/max_contracts_buyable < 1:
                 
                 mod_capital = orderbook.get_mod_capital()
-                max_order_capital = (floor_market_no_ask/100 + range_market_yes_ask/100 + ceiling_market_yes_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask) + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask) + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask)
+                max_order_capital = (floor_market_no_ask/100 + range_market_yes_ask/100 + ceiling_market_yes_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)
             
                 trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100) 
-                
+
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
@@ -665,7 +660,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
             max_contracts_buyable = min(current_volume, closest_range_volume)
             
             eod_capital = orderbook.get_eod_capital()
-            max_order_capital = (current_ask/100)*max_contracts_buyable + (closest_range_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, current_ask) + calculateKalshiFee(max_contracts_buyable, closest_range_ask)
+            max_order_capital = (current_ask/100)*max_contracts_buyable + (closest_range_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, current_ask/100) + calculateKalshiFee(max_contracts_buyable, closest_range_ask/100)
 
             trade_volume = max_contracts_buyable if eod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, eod_capital, current_ask/100, closest_range_ask/100) 
             
@@ -710,7 +705,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
         if abs(current_index_price - current_market_midpoint) > 20:
             logging.info(f'Considering loss arb on middle contracts at current index price {current_index_price} and market midpoint of {current_market_midpoint} with position/closest prices of {min_position_price}/{closest_range_ask}')
 
-            if min_position_price + closest_range_ask + calculateKalshiFee(closest_range_volume, closest_range_ask)/closest_range_volume <= 99:
+            if min_position_price + closest_range_ask + calculateKalshiFee(closest_range_volume, closest_range_ask/100)/closest_range_volume <= 99:
                 late_arb_amount = min(closest_range_volume, min_position_amount)
                 buy_late_arb_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, late_arb_amount, 'yes', closest_range_ask)
                 orderbook.trackPositions(PositionType.EodLateArbOrder, late_arb_amount, 'yes', buy_late_arb_order, past_order_to_update=min_price_position)
@@ -742,11 +737,14 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
 
 def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current_datetime, months_array):
     
-    if current_time > time(9,30, 0) and current_time < time(9,45, 0):
+    if current_time > time(9,30,0) and current_time < time(9,46,0):
+        logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
+
+    if current_time > time(9,46, 0) and current_time < time(9,50, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
         run_bod(account, orderbook, current_datetime, months_array)
                     
-    elif current_time > time(9, 45, 0) and current_time < time(15, 50, 0):
+    elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
         logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
         run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
@@ -783,6 +781,8 @@ def operate_kalshi():
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
     
+    got_open = False
+
     while True:
         current_datetime = dt.now()
         current_time = current_datetime.time()
@@ -790,7 +790,13 @@ def operate_kalshi():
         if current_datetime.today().weekday() < 5:
             if current_time < time(16,0,0):
                 if current_time > time(9,30,0):
-                    NDXopen = getIndexOpen()
+                    
+                    if not got_open:
+                        if current_time < time(9, 50, 0):
+                            NDXopen = getNDXCurrentPrice()
+                        else:
+                            NDXopen = getIndexOpen()
+                        got_open = True
                     
                     try:
                         run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array)
@@ -814,4 +820,3 @@ def operate_kalshi():
 if __name__ == "__main__":
     #TODO clean up code
     operate_kalshi()
-
