@@ -240,8 +240,7 @@ class ExchangeClient(KalshiClient):
                         ):
         
         relevant_params = {k: v for k,v in locals().items() if k != 'self' and v != None}   
-
-        print(relevant_params)                         
+                         
         order_json = json.dumps(relevant_params)
         orders_url = self.portfolio_url + '/orders'
         result = self.post(path = orders_url, body = order_json)
