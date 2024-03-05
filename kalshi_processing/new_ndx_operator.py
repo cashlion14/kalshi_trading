@@ -18,7 +18,7 @@ FAKE_DATA = False
 
 BUY_MINUTE = 50         # first minute (3:xx PM) we allow to buy 
 SELL_MINUTE = 56        # first minute (3:xx PM) we allow to sell
-CAPITAL_PERCENTAGE = .2 # percentage of our capital to bet on each trade (from 0 to 1)
+CAPITAL_PERCENTAGE = .8 # percentage of our capital to bet on each trade (from 0 to 1)
 INTERVAL_RATIO = 5      # multiple by 10 to get percent of range you would buy in (spanning middle)
 ASK_LOW = 70            #minumum price to buy stock at
 ASK_HIGH = 97           #maximum price to buy stock at
@@ -39,13 +39,48 @@ class Kalshi_Market:
         self.ticker = ticker
         self.midpoint = midpoint
         self.bid = bid
-        self.ask = ask_low
-        self.vol = vol_low
+        self.ask_low = ask_low
+        self.vol_low = vol_low
         self.ask_high = ask_high
         self.vol_high = vol_high
 
     def __str__(self) -> str:
-        return str(self.ticker) + ' (bid,ask,vol, 2ask, 2vol): ' + str(self.bid) + ', ' + str(self.ask) + ', ' + str(self.vol) + str(self.ask_high) + str(self.vol_high)
+        return str(self.ticker) + ' (bid,ask,vol, 2ask, 2vol): ' + str(self.bid) + ', ' + str(self.ask_low) + ', ' + str(self.vol_low) + str(self.ask_high) + str(self.vol_high)
+
+"""
+A Kalshi Market containing information about a given range market
+    bids and asks: structured as a list of price-volume tuples, [(price, vol), (price, vol), ...]
+"""
+class KalshiMarket:
+    def __init__(self,ticker,midpoint,yeses, nos):
+        self.ticker = ticker
+        self.midpoint = midpoint
+        self.yeses = yeses
+        self.nos = nos
+        
+    def get_best_yes_ask(self):
+        return self.yeses[0][0]
+
+    def get_best_yes_bid(self):
+        return 100-self.nos[0][0]
+
+"""
+Keeps track of the current positions that we hold
+    each position is indexed by market, price, and volume
+    positions is a dictionary within a dictionary
+    the outer dictionary maps ticker to a dictionary containing yes and no
+    within the inner dictionary, map yes & no string to a list
+    list contains price-volume tuples [(price, vol), (price, vol), ...]
+"""
+class Positions:
+    def __init__(self):
+        self.positions = {}
+    
+    def get_market_positions(self, ticker: str, yes_market: bool):
+        return self.positions[ticker]['yes' if yes_market else 'no']
+    
+    def total_open_portfolio():
+        pass
 
 """
 Get NDX Open and Current Price
@@ -78,7 +113,7 @@ def getNDXCurrentPrice():
         return NDXVal
 
 """
-Gets data for three Kalshi markets: below, current, and above
+Creates a kalshi market class for the current market, as well as above and below markets
 """
 def getKalshiData(exchange_client,current_datetime,NDX_current):
     
@@ -101,17 +136,21 @@ def getKalshiData(exchange_client,current_datetime,NDX_current):
         if event_ticker[-6] == 'B':
             
             #get prices for given market
+            # print(exchange_client.get_orderbook(event_ticker))
             market_orderbook = exchange_client.get_orderbook(event_ticker)['orderbook']['yes']
 
-            if market_orderbook is not None:
-                market_data = market_orderbook[-1]
-                market_bid = market_data[0]
-                market_vol = market_data[1]
+            orderbook = exchange_client.get_orderbook(event_ticker)['orderbook']
+
+            if orderbook is not None:
+                yes_book = orderbook['yes']
+                no_book = orderbook['no']
+                
+                yeses = yes_book if yes_book is not None else []
+                nos = no_book if no_book is not None else []
                 
                 midpoint = float(event_ticker[-5:])
-                market_ask = event['yes_ask']
                 
-                market_object = Kalshi_Market(event_ticker,midpoint,market_bid,market_ask,market_vol)
+                market_object = KalshiMarket(event_ticker,midpoint,yeses,nos)
                 kalshi_markets.append(market_object)
             
     #find the closest market to the current price
@@ -156,9 +195,8 @@ def updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,hi
     cur_yes_book = cur_event_response['orderbook']['yes']
     cur_no_book = cur_event_response['orderbook']['no']
     
-    cur_market.bid = cur_yes_book[-1][0]
-    cur_market.ask = 100 - cur_no_book[-1][0]
-    cur_market.vol = min(cur_yes_book[-1][1], cur_no_book[-1][1])
+    cur_market.yeses = cur_yes_book if cur_yes_book is not None else []
+    cur_market.nos = cur_no_book if cur_no_book is not None else []
     
     #do for lower book
     if lower_market is not None:
@@ -166,10 +204,8 @@ def updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,hi
         lower_yes_book = lower_event_response['orderbook']['yes']
         lower_no_book = lower_event_response['orderbook']['no']
         
-        lower_market.bid = lower_yes_book[-1][0]
-        lower_market.ask = 100 - lower_no_book[-1][0]
-        lower_market.vol = min(lower_yes_book[-1][1], lower_no_book[-1][1])
-    
+        lower_market.yeses = lower_yes_book if lower_yes_book is not None else []
+        lower_market.nos = lower_no_book if lower_no_book is not None else []
     
     #do for higher book
     if higher_market is not None:
@@ -177,12 +213,10 @@ def updateKalshiData(exchange_client,current_datetime,cur_market,lower_market,hi
         higher_yes_book = higher_event_response['orderbook']['yes']
         higher_no_book = higher_event_response['orderbook']['no']
         
-        higher_market.bid = higher_yes_book[-1][0]
-        higher_market.ask = 100 - higher_no_book[-1][0]
-        higher_market.vol = min(higher_yes_book[-1][1], higher_no_book[-1][1])
-
+        higher_market.yeses = higher_yes_book if higher_yes_book is not None else []
+        higher_market.nos = higher_no_book if higher_no_book is not None else []
+        
     return cur_market, lower_market, higher_market
-            
         
         
 def buy_kalshi(exchange_client,market,amt,side):
@@ -219,7 +253,6 @@ def operate_kalshi():
     markets_set = False
     
     bought_middle = False
-    bought_times = 0
     bought_edge = False
     bought_twice = False
     sold = False
@@ -227,6 +260,7 @@ def operate_kalshi():
     used_all_capital = False
     
     NDX_open = getNDXOpen()
+    total_capital = 100
     
     while True:
     
@@ -240,6 +274,9 @@ def operate_kalshi():
         else:
             exchange_client = start_kalshi_api()
         
+        NDX_current = getNDXCurrentPrice()
+        print('NDX Data (open, current):',NDX_open, NDX_current)
+            
         
         if TESTING or (current_time < Time(16,0) and current_time > Time(9,30)):    
             NDX_current = getNDXCurrentPrice()
@@ -257,27 +294,24 @@ def operate_kalshi():
             
             print(lower_market)
             print(cur_market)
-            print(higher_market)
-            
-            
-            total_capital = exchange_client.get_balance()['balance']
-            
+            print(higher_market) 
 
             if TESTING or (current_time > Time(15,BUY_MINUTE,0) and current_time < Time(16,0,0)):
-                
-                if bought_times == 3:
-                    used_all_capital = True
-                    
                 print('is in time range')
-                middle_bid, middle_ask = cur_market.bid, cur_market.ask
+                middle_bid, middle_ask = cur_market.get_best_yes_bid(), cur_market.get_best_yes_ask()
                 if lower_market is not None:
-                    lower_bid, lower_ask = lower_market.bid, lower_market.ask
+                    lower_bid, lower_ask = lower_market.get_best_yes_bid(), lower_market.get_best_yes_ask()
                 if higher_market is not None:
-                    higher_bid, higher_ask = higher_market.bid, higher_market.ask
+                    higher_bid, higher_ask = higher_market.get_best_yes_bid(), higher_market.get_best_yes_ask()
                 
                 kalshi_midpoint = cur_market.midpoint
                 is_in_middle_range = abs(NDX_current-kalshi_midpoint) < KALSHI_INTERVAL_SIZE*(INTERVAL_RATIO/10)
                 print('is in middle range:',is_in_middle_range)
+                
+                
+                #buy if you haven't used all of your capital
+                    
+                
                 
                 
                 if not used_all_capital:
@@ -285,7 +319,6 @@ def operate_kalshi():
                         if middle_ask < ASK_HIGH:
                             if 100*(abs(NDX_open-NDX_current)/NDX_open) < PERCENT_CHANGE:
                                 buy_kalshi(exchange_client,cur_market, total_capital * CAPITAL_PERCENTAGE, 'yes')
-                                bought_times += 1
                                 middle_bought_price = middle_ask
                                 bought_middle = True
                     else:
@@ -297,7 +330,7 @@ def operate_kalshi():
                             bought_edge = True
                             buy_kalshi(exchange_client,cur_market, total_capital * CAPITAL_PERCENTAGE/2, 'yes')
                             buy_kalshi(exchange_client,higher_market if is_higher else lower_market, total_capital * CAPITAL_PERCENTAGE/2, 'yes')
-                            bought_times += 1
+                            
                 
                 if bought_middle and not is_in_middle_range:
                     higher = NDX_current - kalshi_midpoint > 0
@@ -310,8 +343,7 @@ def operate_kalshi():
                             middle_bought_price += side_ask
                             bought_twice = True
                             buy_kalshi(exchange_client,higher_market if higher else lower_market,total_capital * CAPITAL_PERCENTAGE, 'yes')
-                            bought_times += 1
-                            
+                        
                     elif middle_ask < middle_bought_price - LOSS_FLOOR and not sold and not bought_twice:
                         print('considering mitigating losses')
                         sell_loss = middle_bid - middle_bought_price
@@ -322,13 +354,10 @@ def operate_kalshi():
                             sold = True
                             sold_price = middle_bid
                             buy_kalshi(exchange_client,cur_market,total_capital * CAPITAL_PERCENTAGE,'no')
-                            bought_times += 1
                         else:
                             bought_twice = True
                             middle_bought_price += side_ask
                             buy_kalshi(exchange_client,higher_market if higher else lower_market,total_capital * CAPITAL_PERCENTAGE, 'yes')
-                            bought_times += 1
-            
             else:
                 print('not in time range')
 
@@ -339,7 +368,7 @@ def operate_kalshi():
 if __name__ == "__main__":
     # market_object = Kalshi_Market('INX-24FEB14-B4962',4962,1,1,1)
     # buy_kalsh2(start_kalshi_api(),market_object,100,'yes')
-    operate_kalshi()
+    # operate_kalshi()
     
     #TODO: change KalshiMarket filling s.t. we get the second lowest market as well
     
@@ -372,30 +401,4 @@ if __name__ == "__main__":
     
     
     #to implement higher trading volumes for tomorrow, I need to set it to buy multiple times
-    
-    
-    """
-    A Kalshi Market containing information about a given range market
-        bids and asks: structured as a list of price-volume tuples, [(price, vol), (price, vol), ...]
-    """
-    class KalshiMarket:
-        def __init__(self,ticker,midpoint,bids, asks):
-            self.ticker = ticker
-            self.midpoint = midpoint
-            self.bids = bids
-            self.asks = asks
-
-    """
-    Keeps track of the current positions that we hold
-        each position is indexed by market, price, and volume
-        positions is a dictionary within a dictionary
-        the outer dictionary maps ticker to a dictionary containing yes and no
-        within the inner dictionary, map yes & no string to a list
-        list contains price-volume tuples [(price, vol), (price, vol), ...]
-    """
-    class Positions:
-        def __init__(self):
-            self.positions = {}
-        
-        def get_market_positions(self, ticker: str, yes_market: bool):
-            return self.positions[ticker]['yes' if yes_market else 'no']
+    # print(getNDXCurrentPrice())

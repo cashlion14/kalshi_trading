@@ -572,7 +572,7 @@ def run_bod(account, orderbook: Orderbook, current_datetime, months_array):
     bod_capital = orderbook.get_bod_capital() * 0.42
     if len(orderbook.get_bod_contracts()) == 0:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask/100)
-        bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_market_ask+10)
+        bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
 
         orderbook.trackPositions(PositionType.BodOrder, trade_volume, 'yes', bod_order) 
         logging.info(f'Made an order for Bod contract of amount {trade_volume} at price {current_market_ask} on market {current_market.get_ticker()}')
@@ -757,7 +757,6 @@ def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current
 def operate_kalshi():
     
     #TODO add phone/email logging
-    #TODO set up on Grier's computer
 
     #start up the logging functionality
     current_datetime = dt.now()
