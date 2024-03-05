@@ -366,17 +366,29 @@ def getIndexOpen(ticker="^NDX"):
 Takes a screenshot of Kalshi to get the current NDX price
 Keep safari open to the left of the screen, one tab, not logged in, scrolled to top
 """
-def getNDXCurrentPrice():
-    logging.info(f'Getting current NDX price')
-    ss_region = (150,210, 260, 270)
-    ss_img = ImageGrab.grab(ss_region)
-    # ss_img.show()
+def getNDXCurrentPrice(safari=True):
+    if safari:
+        logging.info(f'Getting current NDX price')
+        ss_region = (150,210, 260, 270)
+        ss_img = ImageGrab.grab(ss_region)
+        # ss_img.show()
 
-    num = str(ocr.image_to_string(ss_img))
-    temp = re.findall(r'\d+', num)
-    NDXVal = int(''.join([str(x) for x in temp]))
-    logging.info(f'Got current NDX price')
-    return NDXVal
+        num = str(ocr.image_to_string(ss_img))
+        temp = re.findall(r'\d+', num)
+        NDXVal = int(''.join([str(x) for x in temp]))
+        logging.info(f'Got current NDX price')
+        return NDXVal
+    else:
+        logging.info(f'Getting current NDX price')
+        ss_region = (150,290, 260, 330)
+        ss_img = ImageGrab.grab(ss_region)
+        # ss_img.show()
+
+        num = str(ocr.image_to_string(ss_img))
+        temp = re.findall(r'\d+', num)
+        NDXVal = int(''.join([str(x) for x in temp]))
+        logging.info(f'Got current NDX price')
+        return NDXVal
 
 """
 Places a basic kalshi market buy order
@@ -559,15 +571,15 @@ def calculateVolumeToTrade(position_type, eod_capital, current_price, closest_pr
         return math.floor(numerator/(den_one+den_two+den_three+den_four))
     
     elif position_type == PositionType.BodOrder:
-        numerator = eod_capital - 0.01
+        numerator = (0.27*eod_capital) - 0.01
         denominator = current_price + 0.035 * current_price * (1-current_price)
         return math.floor(numerator/denominator)
         
 ### STRATEGIES ### 
 
-def run_bod(account, orderbook: Orderbook, current_datetime, months_array):
+def run_bod(account, orderbook: Orderbook, current_datetime, months_array, current_index_price):
     #get the current market and buy it up to 42 percent
-    current_market = getKalshiMarkets(account, Strategy.Bod, current_datetime, months_array)
+    current_market = getKalshiMarkets(account, Strategy.Bod, current_datetime, months_array, current_index_price)
     current_market_ask = current_market.get_best_yes_ask()
     
     bod_capital = orderbook.get_bod_capital() * 0.42
@@ -578,6 +590,8 @@ def run_bod(account, orderbook: Orderbook, current_datetime, months_array):
 
         orderbook.trackPositions(PositionType.BodOrder, trade_volume, 'yes', bod_order) 
         logging.info(f'Made an order for Bod contract of amount {trade_volume} at price {current_market_ask} on market {current_market.get_ticker()}')
+    else:
+        sleeper.sleep(60)
     
 def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
     range_markets, above_markets = getKalshiMarkets(account, Strategy.ModArb, current_datetime, months_array)
@@ -643,7 +657,7 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
         
 def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_array, market_size=100, middle_range_percent=50, arb_value=98, ask_high=97, percent_change=2, loss_floor=10):
     #get current NDX price and working capital
-    current_index_price = getNDXCurrentPrice()
+    current_index_price = getNDXCurrentPrice(False)
     
     #get markets above, middle, below
     low_market, current_market, high_market = getKalshiMarkets(account, Strategy.Eod, current_datetime, months_array, current_index_price)
@@ -751,9 +765,9 @@ def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current
     if current_time > time(9,30,0) and current_time < time(9,46,0):
         logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
 
-    if current_time > time(9,46, 0) and current_time < time(9,50, 0):
+    if current_time > time(9,46, 0) and current_time < time(10, 30, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
-        run_bod(account, orderbook, current_datetime, months_array)
+        run_bod(account, orderbook, current_datetime, months_array, NDXopen)
                     
     elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
         logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
@@ -766,8 +780,6 @@ def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current
 ### OPERATOR ###
 
 def operate_kalshi():
-    
-    #TODO add phone/email logging
 
     #start up the logging functionality
     current_datetime = dt.now()
@@ -803,7 +815,7 @@ def operate_kalshi():
                     
                     if not got_open:
                         if current_time < time(9, 50, 0):
-                            NDXopen = getNDXCurrentPrice()
+                            NDXopen = getNDXCurrentPrice(False)
                         else:
                             NDXopen = getIndexOpen()
                         got_open = True
@@ -829,6 +841,5 @@ def operate_kalshi():
                   
 if __name__ == "__main__":
     #TODO clean up code
-    # operate_kalshi()
-    send_email_update('yes', 89, 1)
+    operate_kalshi()
     
