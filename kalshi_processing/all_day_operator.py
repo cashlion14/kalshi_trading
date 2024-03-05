@@ -11,6 +11,7 @@ import re
 import uuid
 from enum import Enum
 import math
+from email_sender import send_email_update
 
 ### KALSHI CLASS REPRESENTATIONS ###
 
@@ -573,6 +574,7 @@ def run_bod(account, orderbook: Orderbook, current_datetime, months_array):
     if len(orderbook.get_bod_contracts()) == 0:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask/100)
         bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
+        send_email_update('yes', current_market_ask, trade_volume)
 
         orderbook.trackPositions(PositionType.BodOrder, trade_volume, 'yes', bod_order) 
         logging.info(f'Made an order for Bod contract of amount {trade_volume} at price {current_market_ask} on market {current_market.get_ticker()}')
@@ -614,6 +616,8 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
+                send_email_update('yes/no/no', 'Range/Above', trade_volume)
+                
                 
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '2', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
@@ -631,6 +635,7 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
+                send_email_update('no/yes/yes', 'Range/Above', trade_volume)
                 
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '1', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
@@ -666,6 +671,8 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
             
             first_edge_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
             second_edge_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, trade_volume, 'yes', closest_range_ask)
+            send_email_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
+            
             orderbook.trackPositions(PositionType.EodArbOrder, trade_volume, 'yes', first_edge_order, second_order_response=second_edge_order) 
 
             logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
@@ -682,6 +689,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
         
                 middle_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
                 orderbook.trackPositions(PositionType.EodMiddleOrder, trade_volume, 'yes', middle_order)
+                send_email_update('yes', current_ask, trade_volume)
                 
                 logging.info(f'Made an order for EOD middle trade of volume {trade_volume} at price {current_ask}')
         
@@ -709,6 +717,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 late_arb_amount = min(closest_range_volume, min_position_amount)
                 buy_late_arb_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, late_arb_amount, 'yes', closest_range_ask)
                 orderbook.trackPositions(PositionType.EodLateArbOrder, late_arb_amount, 'yes', buy_late_arb_order, past_order_to_update=min_price_position)
+                send_email_update('yes', closest_range_ask, trade_volume)
                 
                 logging.info(f'Buying next position over to arb, with closest range price of {closest_range_ask} and position price of {min_position_price} at volume of {late_arb_amount}.')
                 
@@ -722,6 +731,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 buy_no_amount = min(current_bid_volume, max_position_amount)
                 buy_no_order = placeKalshiMarketOrder(account, current_market, buy_no_amount, 'no', 100-current_bid)
                 orderbook.trackPositions(PositionType.EodReverseMiddleOrder, buy_no_amount, 'no', buy_no_order, past_order_to_update=max_price_position)
+                send_email_update('no', 100-current_bid, trade_volume)
                 
                 logging.info(f'Sold on middle contracts to mitigate losses for volume of {buy_no_amount} at price {100-current_bid}')
             
@@ -730,6 +740,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 buy_another_yes_amount = min(closest_range_volume, max_position_amount)
                 buy_another_yes_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, buy_another_yes_amount, 'yes', closest_range_ask)
                 orderbook.trackPositions(PositionType.EodLateArbOrder, buy_another_yes_amount, 'yes', buy_another_yes_order, past_order_to_update=max_price_position)
+                send_email_update('yes', closest_range_ask, trade_volume)
                 
                 logging.info(f'Bought edge contract to mitigate losses with volume of {buy_another_yes_amount} for {closest_range_ask}')
     else:
@@ -818,4 +829,6 @@ def operate_kalshi():
                   
 if __name__ == "__main__":
     #TODO clean up code
-    operate_kalshi()
+    # operate_kalshi()
+    send_email_update('yes', 89, 1)
+    
