@@ -12,14 +12,14 @@ def buyStock():
     print(positions)
     
     
-    ticker = 'HIGHAUS-24JAN15-B28.5'
+    ticker = 'INX-24FEB14-B4962'
     order_params = {'ticker':ticker,
                     'client_order_id':str(uuid.uuid4()),
                     'type':'market',
                     'action':'buy',
                     'side':'no',
                     'count':1}
-    # account.create_order(**order_params)
+    account.create_order(**order_params)
     print('bought')
     # positions = account.get_positions()
     # print(positions)
