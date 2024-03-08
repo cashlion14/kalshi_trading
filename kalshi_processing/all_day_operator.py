@@ -11,6 +11,7 @@ import re
 import uuid
 from enum import Enum
 import math
+from email_sender import send_email_update
 
 ### KALSHI CLASS REPRESENTATIONS ###
 
@@ -95,6 +96,9 @@ class Orderbook:
     
     def get_mod_capital(self):
         return self.mod_capital
+    
+    def get_starting_capital(self):
+        return self.starting_capital
     
     def set_mod_capital(self, amount):
         self.mod_capital += amount
@@ -365,17 +369,29 @@ def getIndexOpen(ticker="^NDX"):
 Takes a screenshot of Kalshi to get the current NDX price
 Keep safari open to the left of the screen, one tab, not logged in, scrolled to top
 """
-def getNDXCurrentPrice():
-    logging.info(f'Getting current NDX price')
-    ss_region = (150,210, 260, 270)
-    ss_img = ImageGrab.grab(ss_region)
-    # ss_img.show()
+def getNDXCurrentPrice(safari=True):
+    if safari:
+        logging.info(f'Getting current NDX price')
+        ss_region = (150,210, 260, 270)
+        ss_img = ImageGrab.grab(ss_region)
+        # ss_img.show()
 
-    num = str(ocr.image_to_string(ss_img))
-    temp = re.findall(r'\d+', num)
-    NDXVal = int(''.join([str(x) for x in temp]))
-    logging.info(f'Got current NDX price')
-    return NDXVal
+        num = str(ocr.image_to_string(ss_img))
+        temp = re.findall(r'\d+', num)
+        NDXVal = int(''.join([str(x) for x in temp]))
+        logging.info(f'Got current NDX price')
+        return NDXVal
+    else:
+        logging.info(f'Getting current NDX price')
+        ss_region = (150,290, 260, 330)
+        ss_img = ImageGrab.grab(ss_region)
+        # ss_img.show()
+
+        num = str(ocr.image_to_string(ss_img))
+        temp = re.findall(r'\d+', num)
+        NDXVal = int(''.join([str(x) for x in temp]))
+        logging.info(f'Got current NDX price')
+        return NDXVal
 
 """
 Places a basic kalshi market buy order
@@ -411,13 +427,15 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
         
         #create KalshiMarkets
         current_orderbook = account.get_orderbook(current_ticker)['orderbook']
-        
         if current_orderbook is not None:
             yes_book = current_orderbook['yes']
             no_book = current_orderbook['no']
             
             yeses = yes_book if yes_book is not None else []
             nos = no_book if no_book is not None else []
+            
+            if len(yeses) == 0 and len(nos) == 0:
+                raise Exception('current market has no volume')
             
             midpoint = float(current_ticker[-5:])
             
@@ -564,18 +582,21 @@ def calculateVolumeToTrade(position_type, eod_capital, current_price, closest_pr
         
 ### STRATEGIES ### 
 
-def run_bod(account, orderbook: Orderbook, current_datetime, months_array):
+def run_bod(account, orderbook: Orderbook, current_datetime, months_array, current_index_price):
     #get the current market and buy it up to 42 percent
-    current_market = getKalshiMarkets(account, Strategy.Bod, current_datetime, months_array)
+    current_market = getKalshiMarkets(account, Strategy.Bod, current_datetime, months_array, current_index_price)
     current_market_ask = current_market.get_best_yes_ask()
     
     bod_capital = orderbook.get_bod_capital() * 0.42
     if len(orderbook.get_bod_contracts()) == 0:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask/100)
-        bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_market_ask+10)
+        bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
+        send_email_update('yes', current_market_ask, trade_volume)
 
         orderbook.trackPositions(PositionType.BodOrder, trade_volume, 'yes', bod_order) 
         logging.info(f'Made an order for Bod contract of amount {trade_volume} at price {current_market_ask} on market {current_market.get_ticker()}')
+    else:
+        sleeper.sleep(60)
     
 def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
     range_markets, above_markets = getKalshiMarkets(account, Strategy.ModArb, current_datetime, months_array)
@@ -614,6 +635,8 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
+                send_email_update('yes/no/no', 'Range/Above', trade_volume)
+                
                 
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '2', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
@@ -631,6 +654,7 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
+                send_email_update('no/yes/yes', 'Range/Above', trade_volume)
                 
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '1', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
@@ -638,7 +662,7 @@ def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
         
 def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_array, market_size=100, middle_range_percent=50, arb_value=98, ask_high=97, percent_change=2, loss_floor=10):
     #get current NDX price and working capital
-    current_index_price = getNDXCurrentPrice()
+    current_index_price = getNDXCurrentPrice(False)
     
     #get markets above, middle, below
     low_market, current_market, high_market = getKalshiMarkets(account, Strategy.Eod, current_datetime, months_array, current_index_price)
@@ -666,6 +690,8 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
             
             first_edge_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
             second_edge_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, trade_volume, 'yes', closest_range_ask)
+            send_email_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
+            
             orderbook.trackPositions(PositionType.EodArbOrder, trade_volume, 'yes', first_edge_order, second_order_response=second_edge_order) 
 
             logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
@@ -682,6 +708,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
         
                 middle_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
                 orderbook.trackPositions(PositionType.EodMiddleOrder, trade_volume, 'yes', middle_order)
+                send_email_update('yes', current_ask, trade_volume)
                 
                 logging.info(f'Made an order for EOD middle trade of volume {trade_volume} at price {current_ask}')
         
@@ -709,6 +736,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 late_arb_amount = min(closest_range_volume, min_position_amount)
                 buy_late_arb_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, late_arb_amount, 'yes', closest_range_ask)
                 orderbook.trackPositions(PositionType.EodLateArbOrder, late_arb_amount, 'yes', buy_late_arb_order, past_order_to_update=min_price_position)
+                send_email_update('yes', closest_range_ask, trade_volume)
                 
                 logging.info(f'Buying next position over to arb, with closest range price of {closest_range_ask} and position price of {min_position_price} at volume of {late_arb_amount}.')
                 
@@ -722,6 +750,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 buy_no_amount = min(current_bid_volume, max_position_amount)
                 buy_no_order = placeKalshiMarketOrder(account, current_market, buy_no_amount, 'no', 100-current_bid)
                 orderbook.trackPositions(PositionType.EodReverseMiddleOrder, buy_no_amount, 'no', buy_no_order, past_order_to_update=max_price_position)
+                send_email_update('no', 100-current_bid, trade_volume)
                 
                 logging.info(f'Sold on middle contracts to mitigate losses for volume of {buy_no_amount} at price {100-current_bid}')
             
@@ -730,6 +759,7 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
                 buy_another_yes_amount = min(closest_range_volume, max_position_amount)
                 buy_another_yes_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, buy_another_yes_amount, 'yes', closest_range_ask)
                 orderbook.trackPositions(PositionType.EodLateArbOrder, buy_another_yes_amount, 'yes', buy_another_yes_order, past_order_to_update=max_price_position)
+                send_email_update('yes', closest_range_ask, trade_volume)
                 
                 logging.info(f'Bought edge contract to mitigate losses with volume of {buy_another_yes_amount} for {closest_range_ask}')
     else:
@@ -740,13 +770,13 @@ def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current
     if current_time > time(9,30,0) and current_time < time(9,46,0):
         logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
 
-    if current_time > time(9,46, 0) and current_time < time(9,50, 0):
+    if current_time > time(9,46, 0) and current_time < time(9, 50, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
-        run_bod(account, orderbook, current_datetime, months_array)
+        run_bod(account, orderbook, current_datetime, months_array, NDXopen)
                     
-    elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
-        logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
-        run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
+    # elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
+    #     logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
+    #     run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
         logging.info(f'Trying to run end of day strategy with ${orderbook.get_eod_capital()} in capital')
@@ -755,9 +785,6 @@ def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current
 ### OPERATOR ###
 
 def operate_kalshi():
-    
-    #TODO add phone/email logging
-    #TODO set up on Grier's computer
 
     #start up the logging functionality
     current_datetime = dt.now()
@@ -773,10 +800,10 @@ def operate_kalshi():
         logging.critical(f'Cannot connect to kalshi server/cannot get balance: {error}.')
     
     #create the day's orderbook
-    bod_capital = 25
+    bod_capital = 20
     mod_capital = 50
     eod_capital = 25
-    orderbook = Orderbook(25, 50, 25)
+    orderbook = Orderbook(10, 50, 25)
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -792,10 +819,7 @@ def operate_kalshi():
                 if current_time > time(9,30,0):
                     
                     if not got_open:
-                        if current_time < time(9, 50, 0):
-                            NDXopen = getNDXCurrentPrice()
-                        else:
-                            NDXopen = getIndexOpen()
+                        NDXopen = getIndexOpen()
                         got_open = True
                     
                     try:
