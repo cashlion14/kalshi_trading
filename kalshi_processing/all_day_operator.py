@@ -98,6 +98,9 @@ class Orderbook:
     def get_mod_capital(self):
         return self.mod_capital
     
+    def get_starting_capital(self):
+        return self.starting_capital
+    
     def set_mod_capital(self, amount):
         self.mod_capital += amount
     
@@ -425,13 +428,15 @@ def getKalshiMarkets(account, strategy: Strategy, current_datetime, months_array
         
         #create KalshiMarkets
         current_orderbook = account.get_orderbook(current_ticker)['orderbook']
-        
         if current_orderbook is not None:
             yes_book = current_orderbook['yes']
             no_book = current_orderbook['no']
             
             yeses = yes_book if yes_book is not None else []
             nos = no_book if no_book is not None else []
+            
+            if len(yeses) == 0 and len(nos) == 0:
+                raise Exception('current market has no volume')
             
             midpoint = float(current_ticker[-5:])
             
@@ -572,7 +577,7 @@ def calculateVolumeToTrade(position_type, eod_capital, current_price, closest_pr
         return math.floor(numerator/(den_one+den_two+den_three+den_four))
     
     elif position_type == PositionType.BodOrder:
-        numerator = (0.27*eod_capital) - 0.01
+        numerator = eod_capital - 0.01
         denominator = current_price + 0.035 * current_price * (1-current_price)
         return math.floor(numerator/denominator)
         
@@ -767,14 +772,17 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
         logging.info(f'Market is still safely in the middle range')
 
 def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current_datetime, months_array):
+    
+    if current_time > time(9,30,0) and current_time < time(9,46,0):
+        logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
 
-    if current_time > time(9,47, 0) and current_time < time(9, 55, 0):
+    if current_time > time(9,46, 0) and current_time < time(9, 50, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
         run_bod(account, orderbook, current_datetime, months_array, NDXopen)
                     
-    elif current_time > time(9, 55, 0) and current_time < time(15, 50, 0):
-        # logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
-        run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
+    # elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
+    #     logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
+    #     run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
         logging.info(f'Trying to run end of day strategy with ${orderbook.get_eod_capital()} in capital')
@@ -798,10 +806,10 @@ def operate_kalshi():
         logging.critical(f'Cannot connect to kalshi server/cannot get balance: {error}.')
     
     #create the day's orderbook
-    bod_capital = 25
+    bod_capital = 20
     mod_capital = 50
     eod_capital = 25
-    orderbook = Orderbook(25, 50, 25)
+    orderbook = Orderbook(10, 50, 25)
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -843,4 +851,3 @@ if __name__ == "__main__":
     #make sure we are getting the correct price from kalshi
     #make error messages appear fully with traceback
     operate_kalshi()
-    
