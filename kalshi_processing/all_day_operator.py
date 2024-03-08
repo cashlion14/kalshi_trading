@@ -12,6 +12,7 @@ import uuid
 from enum import Enum
 import math
 from email_sender import send_email_update
+import traceback
 
 ### KALSHI CLASS REPRESENTATIONS ###
 
@@ -583,7 +584,8 @@ def run_bod(account, orderbook: Orderbook, current_datetime, months_array, curre
     current_market_ask = current_market.get_best_yes_ask()
     
     bod_capital = orderbook.get_bod_capital() * 0.42
-    if len(orderbook.get_bod_contracts()) == 0:
+
+    if len(orderbook.get_bod_contracts()) == 0 and bod_capital >= 1:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask/100)
         bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
         send_email_update('yes', current_market_ask, trade_volume)
@@ -593,68 +595,70 @@ def run_bod(account, orderbook: Orderbook, current_datetime, months_array, curre
     else:
         sleeper.sleep(60)
     
-def run_all_day_arbitrage(account, orderbook, current_datetime, months_array):
+def run_all_day_arbitrage(account, orderbook: Orderbook, current_datetime, months_array):
     range_markets, above_markets = getKalshiMarkets(account, Strategy.ModArb, current_datetime, months_array)
+
+    if orderbook.get_mod_capital() > 1:
     
-    for range_market in range_markets:
-        range_floor = range_market.get_range_floor()
-        range_ceiling = range_market.get_range_ceiling()
-        
-        floor_market = -1
-        for above_market in above_markets:
-            if above_market.get_midpoint() == range_floor:
-                floor_market = above_market
+        for range_market in range_markets:
+            range_floor = range_market.get_range_floor()
+            range_ceiling = range_market.get_range_ceiling()
+            
+            floor_market = -1
+            for above_market in above_markets:
+                if above_market.get_midpoint() == range_floor:
+                    floor_market = above_market
+                    
+            ceiling_market = -1
+            for above_market in above_markets:
+                if above_market.get_midpoint() == range_ceiling:
+                    ceiling_market = above_market
+            
+            if floor_market != -1 and ceiling_market != -1:
+                range_market_yes_ask, range_market_yes_vol = range_market.get_best_yes_ask(volume=True)
+                range_market_no_ask, range_market_no_vol = range_market.get_best_no_ask(volume=True)
+                floor_market_yes_ask, floor_market_yes_vol = floor_market.get_best_yes_ask(volume=True)
+                floor_market_no_ask, floor_market_no_vol = floor_market.get_best_no_ask(volume=True)
+                ceiling_market_yes_ask, ceiling_market_yes_vol = ceiling_market.get_best_yes_ask(volume=True)
+                ceiling_market_no_ask, ceiling_market_no_vol = ceiling_market.get_best_no_ask(volume=True)
                 
-        ceiling_market = -1
-        for above_market in above_markets:
-            if above_market.get_midpoint() == range_ceiling:
-                ceiling_market = above_market
-        
-        if floor_market != -1 and ceiling_market != -1:
-            range_market_yes_ask, range_market_yes_vol = range_market.get_best_yes_ask(volume=True)
-            range_market_no_ask, range_market_no_vol = range_market.get_best_no_ask(volume=True)
-            floor_market_yes_ask, floor_market_yes_vol = floor_market.get_best_yes_ask(volume=True)
-            floor_market_no_ask, floor_market_no_vol = floor_market.get_best_no_ask(volume=True)
-            ceiling_market_yes_ask, ceiling_market_yes_vol = ceiling_market.get_best_yes_ask(volume=True)
-            ceiling_market_no_ask, ceiling_market_no_vol = ceiling_market.get_best_no_ask(volume=True)
-            
-            logging.info(f'Testing arbitrage opportunity 1, <$2, with a floor market yes of {floor_market_yes_ask}, a range market no of {range_market_no_ask} and a ceiling market no of {ceiling_market_no_ask}.')
-            max_contracts_buyable = min(floor_market_yes_vol, range_market_no_vol, ceiling_market_no_vol)
-            if sum([floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100]) + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)/max_contracts_buyable < 2:
-            
-                mod_capital = orderbook.get_mod_capital()
-                max_order_capital = (floor_market_yes_ask/100 + range_market_no_ask/100 + ceiling_market_no_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)
-            
-                trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100) 
-            
-                first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
-                second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
-                third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
-                send_email_update('yes/no/no', 'Range/Above', trade_volume)
+                # logging.info(f'Testing arbitrage opportunity 1, <$2, with a floor market yes of {floor_market_yes_ask}, a range market no of {range_market_no_ask} and a ceiling market no of {ceiling_market_no_ask}.')
+                max_contracts_buyable = min(floor_market_yes_vol, range_market_no_vol, ceiling_market_no_vol)
+                if sum([floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100]) + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)/max_contracts_buyable < 2:
                 
+                    mod_capital = orderbook.get_mod_capital()
+                    max_order_capital = (floor_market_yes_ask/100 + range_market_no_ask/100 + ceiling_market_no_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_no_ask/100)
                 
-                orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '2', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
+                    trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_yes_ask/100, range_market_no_ask/100, ceiling_market_no_ask/100) 
+                
+                    first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
+                    second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
+                    third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
+                    send_email_update('yes/no/no', 'Range/Above', trade_volume)
+                    
+                    
+                    orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '2', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
-                logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_yes_ask/100} and {range_market_no_ask/100} and {ceiling_market_no_ask}')
-            
-            logging.info(f'Testing arbitrage opportunity 2, <$1, with a floor market no of {floor_market_no_ask}, a range market yes of {range_market_yes_ask} and a ceiling market yes of {ceiling_market_yes_ask}.')
-            max_contracts_buyable = min(floor_market_no_vol, range_market_yes_vol, ceiling_market_yes_vol)
-            if sum([floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100])  + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)/max_contracts_buyable < 1:
+                    logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_yes_ask/100} and {range_market_no_ask/100} and {ceiling_market_no_ask}')
                 
-                mod_capital = orderbook.get_mod_capital()
-                max_order_capital = (floor_market_no_ask/100 + range_market_yes_ask/100 + ceiling_market_yes_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)
-            
-                trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100) 
-
-                first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
-                second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
-                third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
-                send_email_update('no/yes/yes', 'Range/Above', trade_volume)
+                # logging.info(f'Testing arbitrage opportunity 2, <$1, with a floor market no of {floor_market_no_ask}, a range market yes of {range_market_yes_ask} and a ceiling market yes of {ceiling_market_yes_ask}.')
+                max_contracts_buyable = min(floor_market_no_vol, range_market_yes_vol, ceiling_market_yes_vol)
+                if sum([floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100])  + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100)/max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)/max_contracts_buyable < 1:
+                    
+                    mod_capital = orderbook.get_mod_capital()
+                    max_order_capital = (floor_market_no_ask/100 + range_market_yes_ask/100 + ceiling_market_yes_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, floor_market_no_ask/100) + calculateKalshiFee(max_contracts_buyable, range_market_yes_ask/100) + calculateKalshiFee(max_contracts_buyable, ceiling_market_yes_ask/100)
                 
-                orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '1', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
+                    trade_volume = max_contracts_buyable if mod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, mod_capital, floor_market_no_ask/100, range_market_yes_ask/100, ceiling_market_yes_ask/100) 
 
-                logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_no_ask/100} and {range_market_yes_ask/100} and {ceiling_market_yes_ask}')
-        
+                    first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
+                    second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
+                    third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
+                    send_email_update('no/yes/yes', 'Range/Above', trade_volume)
+                    
+                    orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '1', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
+
+                    logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_no_ask/100} and {range_market_yes_ask/100} and {ceiling_market_yes_ask}')
+            
 def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_array, market_size=100, middle_range_percent=50, arb_value=98, ask_high=97, percent_change=2, loss_floor=10):
     #get current NDX price and working capital
     current_index_price = getNDXCurrentPrice(False)
@@ -668,45 +672,47 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
     #check if NDX is in middle range
     in_middle_range = abs(current_index_price-current_market_midpoint) < (market_size/2)*(middle_range_percent/100)
     
-    #run buying steps: can buy middle or buy the edge
-    if not in_middle_range:
-        is_above_midpoint = current_index_price - current_market_midpoint > 0
-        current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
-        closest_range_ask, closest_range_volume = high_market.get_best_yes_ask(volume=True) if is_above_midpoint else low_market.get_best_yes_ask(volume=True)
-        logging.info(f'Considering an edge buy with current market at {current_ask}, closest market at {closest_range_ask}')
-        
-        if current_ask + closest_range_ask < arb_value:
-            max_contracts_buyable = min(current_volume, closest_range_volume)
-            
-            eod_capital = orderbook.get_eod_capital()
-            max_order_capital = (current_ask/100)*max_contracts_buyable + (closest_range_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, current_ask/100) + calculateKalshiFee(max_contracts_buyable, closest_range_ask/100)
+    if orderbook.get_eod_capital() >= 1:
 
-            trade_volume = max_contracts_buyable if eod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, eod_capital, current_ask/100, closest_range_ask/100) 
+        #run buying steps: can buy middle or buy the edge
+        if not in_middle_range:
+            is_above_midpoint = current_index_price - current_market_midpoint > 0
+            current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
+            closest_range_ask, closest_range_volume = high_market.get_best_yes_ask(volume=True) if is_above_midpoint else low_market.get_best_yes_ask(volume=True)
+            logging.info(f'Considering an edge buy with current market at {current_ask}, closest market at {closest_range_ask}')
             
-            first_edge_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
-            second_edge_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, trade_volume, 'yes', closest_range_ask)
-            send_email_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
-            
-            orderbook.trackPositions(PositionType.EodArbOrder, trade_volume, 'yes', first_edge_order, second_order_response=second_edge_order) 
-
-            logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
-    else:
-        current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
-        if current_ask < ask_high:
-            if 100*(abs(NDXopen-current_index_price)/NDXopen) < percent_change:
-                logging.info(f'Considering a middle buy with current market at {current_ask}, percent change at {percent_change}')
+            if current_ask + closest_range_ask < arb_value:
+                max_contracts_buyable = min(current_volume, closest_range_volume)
                 
                 eod_capital = orderbook.get_eod_capital()
-                max_order_capital = (current_ask/100)*current_volume + calculateKalshiFee(current_volume, (current_ask/100))
+                max_order_capital = (current_ask/100)*max_contracts_buyable + (closest_range_ask/100)*max_contracts_buyable + calculateKalshiFee(max_contracts_buyable, current_ask/100) + calculateKalshiFee(max_contracts_buyable, closest_range_ask/100)
+
+                trade_volume = max_contracts_buyable if eod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodArbOrder, eod_capital, current_ask/100, closest_range_ask/100) 
                 
-                trade_volume = current_volume if eod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodMiddleOrder, eod_capital, current_ask/100)
-        
-                middle_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
-                orderbook.trackPositions(PositionType.EodMiddleOrder, trade_volume, 'yes', middle_order)
-                send_email_update('yes', current_ask, trade_volume)
+                first_edge_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
+                second_edge_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, trade_volume, 'yes', closest_range_ask)
+                send_email_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
                 
-                logging.info(f'Made an order for EOD middle trade of volume {trade_volume} at price {current_ask}')
-        
+                orderbook.trackPositions(PositionType.EodArbOrder, trade_volume, 'yes', first_edge_order, second_order_response=second_edge_order) 
+
+                logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
+        else:
+            current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
+            if current_ask < ask_high:
+                if 100*(abs(NDXopen-current_index_price)/NDXopen) < percent_change:
+                    logging.info(f'Considering a middle buy with current market at {current_ask}, percent change at {percent_change}')
+                    
+                    eod_capital = orderbook.get_eod_capital()
+                    max_order_capital = (current_ask/100)*current_volume + calculateKalshiFee(current_volume, (current_ask/100))
+                    
+                    trade_volume = current_volume if eod_capital >= max_order_capital else calculateVolumeToTrade(PositionType.EodMiddleOrder, eod_capital, current_ask/100)
+            
+                    middle_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
+                    orderbook.trackPositions(PositionType.EodMiddleOrder, trade_volume, 'yes', middle_order)
+                    send_email_update('yes', current_ask, trade_volume)
+                    
+                    logging.info(f'Made an order for EOD middle trade of volume {trade_volume} at price {current_ask}')
+            
     #if bought, run risk management steps
     if not in_middle_range and orderbook.check_eod_middle():
         logging.info('Market has left the middle range and we have middle contracts that are not risk managed')
@@ -761,16 +767,13 @@ def run_eod(account, orderbook: Orderbook, NDXopen, current_datetime, months_arr
         logging.info(f'Market is still safely in the middle range')
 
 def run_strategies(account, orderbook: Orderbook, current_time, NDXopen, current_datetime, months_array):
-    
-    if current_time > time(9,30,0) and current_time < time(9,46,0):
-        logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
 
-    if current_time > time(9,46, 0) and current_time < time(10, 30, 0):
+    if current_time > time(9,47, 0) and current_time < time(9, 55, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
         run_bod(account, orderbook, current_datetime, months_array, NDXopen)
                     
-    elif current_time > time(9, 50, 0) and current_time < time(15, 50, 0):
-        logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
+    elif current_time > time(9, 55, 0) and current_time < time(15, 50, 0):
+        # logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
         run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
@@ -802,7 +805,6 @@ def operate_kalshi():
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-    
     got_open = False
 
     while True:
@@ -811,21 +813,17 @@ def operate_kalshi():
         
         if current_datetime.today().weekday() < 5:
             if current_time < time(16,0,0):
-                if current_time > time(9,30,0):
-                    
+                if current_time > time(9,47,0):
                     if not got_open:
-                        if current_time < time(9, 50, 0):
-                            NDXopen = getNDXCurrentPrice(False)
-                        else:
-                            NDXopen = getIndexOpen()
+                        NDXopen = getIndexOpen()
                         got_open = True
                     
                     try:
                         run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array)
                     except Exception as error:
                         print('An error occurred running strategies: \n', error)
-                        logging.warning(f'An error occurred running strategies: {error}')
-                
+                        logging.warning(f'An error occurred running strategies: {traceback.format_exc()}')
+                        sleeper.sleep(5)
                 else:
                     print(f'Current Time is: {current_time}. It is not yet time to trade.')
                     logging.info(f'It is not yet time to trade. Will check again in 1 minute.')
@@ -841,5 +839,8 @@ def operate_kalshi():
                   
 if __name__ == "__main__":
     #TODO clean up code
+    #Fix bod bug in code -> mistake in code
+    #make sure we are getting the correct price from kalshi
+    #make error messages appear fully with traceback
     operate_kalshi()
     
