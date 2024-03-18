@@ -44,7 +44,6 @@ class Strategy(Enum):
     ModArb = 2
     Eod = 3
 
-
 ### KALSHI CLASS REPRESENTATIONS ###
 
 """
@@ -733,7 +732,7 @@ def run_eod(account: ExchangeClient, safari: bool, orderbook: Orderbook, NDXopen
         closest_range_ask, closest_range_volume = high_market.get_best_yes_ask(volume=True) if is_above_midpoint else low_market.get_best_yes_ask(volume=True)
         logging.info(f'Considering an edge buy with current market at {current_ask}, closest market at {closest_range_ask}')
         
-        if current_ask + closest_range_ask < arb_value:
+        if current_ask + closest_range_ask < arb_value and current_ask > 3 and closest_range_ask > 3:
             max_contracts_buyable = min(current_volume, closest_range_volume)
             
             eod_capital = orderbook.get_eod_capital()
@@ -750,7 +749,7 @@ def run_eod(account: ExchangeClient, safari: bool, orderbook: Orderbook, NDXopen
             logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
     else:
         current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
-        if current_ask < ask_high:
+        if current_ask < ask_high and current_ask > 20:
             if 100*(abs(NDXopen-current_index_price)/NDXopen) < percent_change:
                 logging.info(f'Considering a middle buy with current market at {current_ask}, percent change at {percent_change}')
                 
