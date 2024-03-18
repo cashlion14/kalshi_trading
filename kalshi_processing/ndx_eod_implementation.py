@@ -90,7 +90,8 @@ def getKalshiData(exchange_client,current_datetime,NDX_current):
         
     #create prefix for NDX range markets and get all markets with that prefix
     kalshi_ticker = 'NASDAQ100-' + year + month + day
-    # print('Kalshi Ticker:', kalshi_ticker)
+    kalshi_ticker = 'NASDAQ100-' + year + month + '23'
+    print('Kalshi Ticker:', kalshi_ticker)
     event_response = exchange_client.get_markets(event_ticker=kalshi_ticker)
     # print(event_response)
     
