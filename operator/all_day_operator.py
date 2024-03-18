@@ -11,7 +11,8 @@ import re
 import uuid
 from enum import Enum
 import math
-from selenium import webdriver
+import webbrowser
+import os
 from email_sender import send_trade_update
 from email_sender import send_log
 
@@ -579,7 +580,6 @@ def calculateKalshiFee(amount, price):
     price = price/100
     return math.ceil(100*(0.035 * amount * price * (1-price)))/100
 
-#price betwen 0 and 1
 """
 Calculates the number of contracts to buy for a given order
     current_price: from 0 to 100
@@ -837,31 +837,7 @@ def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: 
     elif current_time > time(15, 45, 0) and current_time < time(15,50,0):
         if not page_reloaded:
             page_reloaded = True
-            
-            #need to update computer vision pixel capture
-            
-            # url = 'https://kalshi.com/markets/nasdaq100/nasdaq-range'
-            # driver = webdriver.Chrome()
-            # driver.maximize_window()
-            # print('hello')
-            # driver.get(url)
-            # print('hello?')
-            
-            # driver.refresh()
-            # while True:
-            #     sleeper.sleep(400)
-            #     driver.refresh()
-            
-            # url = 'https://kalshi.com/markets/nasdaq100/nasdaq-range'
-                
-            # if safari:
-            #     driver = webdriver.Safari()
-            # else:
-            #     driver = webdriver.Chrome()
-                
-            # driver.get(url)
-            # driver.refresh()
-            # driver.quit()
+            webbrowser.get('open -a /Applications/Google\ Chrome.app %s').open('https://kalshi.com/markets/nasdaq100/nasdaq-range') 
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
         logging.info(f'Trying to run end of day strategy with ${orderbook.get_eod_capital()} in capital')
@@ -870,6 +846,10 @@ def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: 
 ### OPERATOR ###
 
 def operate_kalshi(safari:bool=True) -> None:
+    
+    bod_capital = int(input("Enter how much to place in BOD strategy today, as an int. Default is 25: "))
+    mod_capital = int(input("Enter how much to place in MOD strategy today, as an int. Default is 0: "))
+    eod_capital = int(input("Enter how much to place in EOD strategy today, as an int. Default is 50 "))
 
     #start up the logging functionality
     current_datetime = dt.now()
@@ -885,10 +865,7 @@ def operate_kalshi(safari:bool=True) -> None:
         logging.critical(f'Cannot connect to kalshi server/cannot get balance: {error}.')
     
     #create the day's orderbook
-    bod_capital = 20
-    mod_capital = 50
-    eod_capital = 25
-    orderbook = Orderbook(10, 50, 25)
+    orderbook = Orderbook(bod_capital, mod_capital, eod_capital)
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
@@ -922,6 +899,7 @@ def operate_kalshi(safari:bool=True) -> None:
                     logging.info(f'It is not yet time to trade. Will check again in 1 minute.')
                     sleeper.sleep(60)     
             elif current_time > time(16,0,0) and current_time < time(16,6,0):
+                os.system("killall -9 'Google Chrome'")
                 if not sent_log:
                     send_log()
                     sent_log = True
@@ -936,10 +914,4 @@ def operate_kalshi(safari:bool=True) -> None:
                   
 if __name__ == "__main__":
     operate_kalshi()
-    
-    #Merge with source
-    #fix requirements
-    #make chrome driver work
-    #make react app/make it run all the time?
-    #develop new strategies: update BOD, start MOD
-    
+
