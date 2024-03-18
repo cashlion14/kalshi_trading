@@ -622,11 +622,11 @@ def calculateVolumeToTrade(position_type: PositionType, capital: float | int, cu
 Runs the BOD strategy. Strategy: every day in the morning, buy the market that the index is currently in. It's historically underpriced and will make money.
 """
 def run_bod(account: ExchangeClient, orderbook: Orderbook, current_datetime:dt, months_array:list[str], current_index_price: int) -> None:
-    #get the current market and buy it up to 42 percent
+    #get the current market and buy it up to 27 percent
     current_market = getBodMarkets(account, current_datetime, months_array, current_index_price)
     current_market_ask = current_market.get_best_yes_ask()
     
-    bod_capital = orderbook.get_bod_capital() * 0.42
+    bod_capital = orderbook.get_bod_capital() * 0.27
     if len(orderbook.get_bod_contracts()) == 0:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask)
         bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
