@@ -809,7 +809,7 @@ def operate_kalshi():
     bod_capital = 20
     mod_capital = 50
     eod_capital = 25
-    orderbook = Orderbook(10, 50, 25)
+    orderbook = Orderbook(50, 0, 150)
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
