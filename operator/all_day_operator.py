@@ -913,4 +913,5 @@ def operate_kalshi(safari:bool=True) -> None:
                   
 if __name__ == "__main__":
     operate_kalshi()
-
+    #get errors to pop in log
+    #fix trading error here
