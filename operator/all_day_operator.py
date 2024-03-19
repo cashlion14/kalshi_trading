@@ -861,7 +861,7 @@ def operate_kalshi(safari:bool=True) -> None:
         capital = account.get_balance()['balance']/100
         logging.info(f'Connected to api. Current balance is ${capital}.')
     except Exception as error:
-        logging.critical(f'Cannot connect to kalshi server/cannot get balance: {error}.')
+        logging.exception(f'Cannot connect to kalshi server/cannot get balance: {error}.')
     
     #create the day's orderbook
     orderbook = Orderbook(bod_capital, mod_capital, eod_capital)
@@ -891,7 +891,8 @@ def operate_kalshi(safari:bool=True) -> None:
                         run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array, safari, page_reloaded)
                     except Exception as error:
                         print('An error occurred running strategies: \n', error)
-                        logging.warning(f'An error occurred running strategies: {error}')
+                        logging.exception(f'An error occurred running strategies: {error}')
+                        sleeper.sleep(60)
                 
                 else:
                     print(f'Current Time is: {current_time}. It is not yet time to trade.')
@@ -904,8 +905,8 @@ def operate_kalshi(safari:bool=True) -> None:
                     sent_log = True
             else:
                 print(f'Current Time is {current_time}. The trading day is over.')
-                logging.info(f'The trading day is over. Will check again in 5 minutes.')
-                sleeper.sleep(300)
+                logging.info(f'The trading day is over. Will check again in 10 minutes.')
+                sleeper.sleep(600)
         else:
             print(f'Current Time is {current_time}. It is currently the weekend.')
             logging.info(f'It is currently the weekend. Will check in again in 8 hours.')
@@ -913,5 +914,4 @@ def operate_kalshi(safari:bool=True) -> None:
                   
 if __name__ == "__main__":
     operate_kalshi()
-    #get errors to pop in log
     #fix trading error here
