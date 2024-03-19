@@ -824,6 +824,7 @@ def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: 
     
     if current_time > time(9,30,0) and current_time < time(9,47,0):
         logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
+        sleeper.sleep(60)
 
     if current_time > time(9,47, 0) and current_time < time(9, 50, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
@@ -899,8 +900,8 @@ def operate_kalshi(safari:bool=True) -> None:
                     logging.info(f'It is not yet time to trade. Will check again in 1 minute.')
                     sleeper.sleep(60)     
             elif current_time > time(16,0,0) and current_time < time(16,6,0):
-                os.system("killall -9 'Google Chrome'")
                 if not sent_log:
+                    os.system("killall -9 'Google Chrome'")
                     send_log()
                     sent_log = True
             else:
