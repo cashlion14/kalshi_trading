@@ -630,9 +630,9 @@ def run_bod(account: ExchangeClient, orderbook: Orderbook, current_datetime:dt, 
     if len(orderbook.get_bod_contracts()) == 0:
         trade_volume = calculateVolumeToTrade(PositionType.BodOrder, bod_capital, current_market_ask)
         bod_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', 47)
-        send_trade_update('yes', current_market_ask, trade_volume)
 
         orderbook.trackPositions(PositionType.BodOrder, trade_volume, 'yes', bod_order, bod_price=current_market_ask) 
+        send_trade_update('yes', current_market_ask, trade_volume)
         logging.info(f'Made an order for Bod contract of amount {trade_volume} at price {current_market_ask} on market {current_market.get_ticker()}')
     else:
         sleeper.sleep(60)
@@ -677,11 +677,9 @@ def run_all_day_arbitrage(account: ExchangeClient, orderbook: Orderbook, current
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', floor_market_yes_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'no', range_market_no_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', ceiling_market_no_ask)
-                send_trade_update('yes/no/no', 'Range/Above', trade_volume)
-                
                 
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '2', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
-
+                send_trade_update('yes/no/no', 'Range/Above', trade_volume)
                 logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_yes_ask/100} and {range_market_no_ask/100} and {ceiling_market_no_ask}')
             
             logging.info(f'Testing arbitrage opportunity 2, <$1, with a floor market no of {floor_market_no_ask}, a range market yes of {range_market_yes_ask} and a ceiling market yes of {ceiling_market_yes_ask}.')
@@ -696,10 +694,10 @@ def run_all_day_arbitrage(account: ExchangeClient, orderbook: Orderbook, current
                 first_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'no', floor_market_no_ask)
                 second_edge_order = placeKalshiMarketOrder(account, range_market, trade_volume, 'yes', range_market_yes_ask)
                 third_edge_order = placeKalshiMarketOrder(account, floor_market, trade_volume, 'yes', ceiling_market_yes_ask)
-                send_trade_update('no/yes/yes', 'Range/Above', trade_volume)
-                
                 orderbook.trackPositions(PositionType.ModArbOrder, trade_volume, '1', first_edge_order, second_order_response=second_edge_order, third_order_response=third_edge_order) 
 
+                send_trade_update('no/yes/yes', 'Range/Above', trade_volume)
+                
                 logging.info(f'Made an order for range/above arb of volume {trade_volume} at prices {floor_market_no_ask/100} and {range_market_yes_ask/100} and {ceiling_market_yes_ask}')
 
 """
@@ -742,10 +740,9 @@ def run_eod(account: ExchangeClient, safari: bool, orderbook: Orderbook, NDXopen
             
             first_edge_order = placeKalshiMarketOrder(account, current_market, trade_volume, 'yes', current_ask)
             second_edge_order = placeKalshiMarketOrder(account, high_market if is_above_midpoint else low_market, trade_volume, 'yes', closest_range_ask)
-            send_trade_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
             
             orderbook.trackPositions(PositionType.EodArbOrder, trade_volume, 'yes', first_edge_order, second_order_response=second_edge_order) 
-
+            send_trade_update('yes', f'{current_ask} and {closest_range_ask}', trade_volume)
             logging.info(f'Made an order for EOD edge arb of volume {trade_volume} at prices {current_ask} and {closest_range_ask}')
     else:
         current_ask, current_volume = current_market.get_best_yes_ask(volume=True)
@@ -886,7 +883,7 @@ def operate_kalshi(safari:bool=True) -> None:
                         NDXopen = getIndexOpen()
                         got_open = True
                     else:
-                        NDX_open = 0
+                        NDXopen = 0
                     
                     try:
                         run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array, safari, page_reloaded)
