@@ -817,11 +817,7 @@ def run_eod(account: ExchangeClient, safari: bool, orderbook: Orderbook, NDXopen
 """
 Runs our strategies for the day. Holder for our three strategy functions and some logging.
 """
-def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: time, NDXopen: int, current_datetime: dt, months_array: list[str], safari: bool, page_reloaded: bool) -> None:
-    
-    if current_time > time(9,30,0) and current_time < time(9,47,0):
-        logging.info('Trading day has begun, but we are waiting for first price to load for BOD strategy')
-        sleeper.sleep(60)
+def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: time, NDXopen: int, current_datetime: dt, months_array: list[str], safari: bool) -> None:
 
     if current_time > time(9,47, 0) and current_time < time(9, 50, 0):
         logging.info(f'Trying to run beginning of day strategy with ${orderbook.get_bod_capital()} in capital')
@@ -831,10 +827,8 @@ def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: 
     #     logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
     #     run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
-    elif current_time > time(15, 45, 0) and current_time < time(15,50,0):
-        if not page_reloaded:
-            page_reloaded = True
-            webbrowser.get('open -a /Applications/Google\ Chrome.app %s').open('https://kalshi.com/markets/nasdaq100/nasdaq-range') 
+    elif current_time > time(15, 49, 45) and current_time < time(15,49,46):
+        webbrowser.get('open -a /Applications/Google\ Chrome.app %s').open('https://kalshi.com/markets/nasdaq100/nasdaq-range') 
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
         logging.info(f'Trying to run end of day strategy with ${orderbook.get_eod_capital()} in capital')
@@ -846,7 +840,7 @@ def operate_kalshi(safari:bool=True) -> None:
     
     bod_capital = int(input("Enter how much to place in BOD strategy today, as an int. Default is 25: "))
     mod_capital = int(input("Enter how much to place in MOD strategy today, as an int. Default is 0: "))
-    eod_capital = int(input("Enter how much to place in EOD strategy today, as an int. Default is 50 "))
+    eod_capital = int(input("Enter how much to place in EOD strategy today, as an int. Default is 50: "))
 
     #start up the logging functionality
     current_datetime = dt.now()
@@ -866,10 +860,8 @@ def operate_kalshi(safari:bool=True) -> None:
     logging.info(f'Created orderbook, with bod_capital of ${bod_capital}, mod_capital of ${mod_capital}, and eod_capital of ${eod_capital}.')
     
     months_array = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-    
-    got_open = False
     sent_log = False
-    page_reloaded = False
+    got_open = False
 
     while True:
         current_datetime = dt.now()
@@ -877,16 +869,14 @@ def operate_kalshi(safari:bool=True) -> None:
         
         if current_datetime.today().weekday() < 5:
             if current_time < time(16,0,0):
-                if current_time > time(9,30,0):
+                if current_time >= time(9,47,0):
                     
-                    if not got_open and current_time > time(9, 47, 0):
+                    if not got_open:
                         NDXopen = getIndexOpen()
                         got_open = True
-                    else:
-                        NDXopen = 0
                     
                     try:
-                        run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array, safari, page_reloaded)
+                        run_strategies(account, orderbook, current_time, NDXopen, current_datetime, months_array, safari)
                     except Exception as error:
                         print('An error occurred running strategies: \n', error)
                         logging.exception(f'An error occurred running strategies: {error}')
@@ -912,4 +902,3 @@ def operate_kalshi(safari:bool=True) -> None:
                   
 if __name__ == "__main__":
     operate_kalshi()
-    #fix trading error here
