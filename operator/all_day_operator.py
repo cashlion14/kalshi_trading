@@ -827,7 +827,7 @@ def run_strategies(account: ExchangeClient, orderbook: Orderbook, current_time: 
     #     logging.info(f'Trying to run middle of day arb strategy with ${orderbook.get_mod_capital()} in capital')
     #     run_all_day_arbitrage(account, orderbook, current_datetime, months_array)
     
-    elif current_time > time(15, 49, 45) and current_time < time(15,49,46):
+    elif current_time > time(15, 49, 25) and current_time < time(15,49,26):
         webbrowser.get('open -a /Applications/Google\ Chrome.app %s').open('https://kalshi.com/markets/nasdaq100/nasdaq-range') 
     
     elif current_time > time(15, 50, 0) and current_time < time(16, 0, 0):
@@ -901,4 +901,4 @@ def operate_kalshi(safari:bool=True) -> None:
             sleeper.sleep(60*60*8)
                   
 if __name__ == "__main__":
-    operate_kalshi()
+    operate_kalshi(safari=False)
