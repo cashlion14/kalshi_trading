@@ -902,3 +902,4 @@ def operate_kalshi(safari:bool=True) -> None:
                   
 if __name__ == "__main__":
     operate_kalshi(safari=False)
+    #ssh into this computer

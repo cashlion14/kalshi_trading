@@ -19,7 +19,7 @@ def send_log():
     
     text = """\
     """
-    subject = f"[TEST] Today's Kalshi Trading Log"
+    subject = f"Today's Kalshi Trading Log"
     
     sender = "kalshitrading@outlook.com"
     receivers = "nkakarla@mit.edu"
