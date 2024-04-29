@@ -156,7 +156,7 @@ def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list,
                 price += 50
                 
         else: 
-            
+            before_01202024 = start_date < dt(2024, 1, 20, 9, 30, 0)
             #round to the nearest market below
             if low % 100 > 12 and low % 100 < 37:
                 first_price = int(str(low)[:2]+'12')
@@ -170,7 +170,10 @@ def find_sp_daily_range_prices(markets: list, start_date: dt, high_prices: list,
             #work up to the high price
             price = first_price-25
             while price <= high+25:
-                markets.append(f'INXD-{ticker}-B{price}')
+                if before_01202024:
+                    markets.append(f'INXD-{ticker}-B{price}')
+                else:
+                    markets.append(f'INX-{ticker}-B{price}')
                 price += 25
                 
     return markets
@@ -416,7 +419,7 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
         year = date[:2]
         month = date[2:5]
         day = date[-2:]
-        csv_name = f'data_storage/kalshi_data/{mkt_prefix}/{year}/{month}/{day}/{mkt_string}.csv'
+        csv_name = f'data_storage/ml_training_data/{mkt_prefix}/{year}/{month}/{day}/{mkt_string}.csv'
         
         #create the start and end times for the current day
         date_year = int('20'+year)
@@ -477,4 +480,5 @@ def create_index_market_csvs(market: IndexMarket, start_date: dt, end_date: dt, 
 if __name__ == "__main__":
     # create_index_market_csvs(IndexMarket.NasdaqDailyRange, dt(2023, 1, 1, 9, 30, 0), dt(2023, 12, 30, 16, 0, 0), IndexInterval.OneMin)
     start_kalshi_api()
+    create_index_market_csvs(IndexMarket.SpDailyRange, dt(2024, 4, 3, 9, 30, 0), dt(2024, 4, 24, 16, 0, 0), IndexInterval.OneMin)
     pass
